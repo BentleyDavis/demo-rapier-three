@@ -176,7 +176,7 @@ export class Engine {
   }
 
   private createSunlight() {
-    const sunlight = new DirectionalLight(new Color('#ffffff').convertSRGBToLinear(), 0.4);
+    const sunlight = new DirectionalLight(new Color('#ffffff').convertSRGBToLinear(), 2); // Increased intensity
     sunlight.castShadow = true;
     sunlight.shadow.mapSize.width = 1024;
     sunlight.shadow.mapSize.height = 1024;
@@ -193,9 +193,9 @@ export class Engine {
 
   public createAmbientLight() {
     const light = new HemisphereLight(
-      new Color(0xb1e1ff).multiplyScalar(0.2).convertSRGBToLinear(),
-      new Color(0xb97a20).multiplyScalar(0.2).convertSRGBToLinear(),
-      0.6
+      new Color(0xb1e1ff).multiplyScalar(0.4).convertSRGBToLinear(), // Increased sky color intensity
+      new Color(0xb97a20).multiplyScalar(0.4).convertSRGBToLinear(), // Increased ground color intensity
+      1.2 // Increased overall intensity
     );
     this.scene.add(light);
     return light;
