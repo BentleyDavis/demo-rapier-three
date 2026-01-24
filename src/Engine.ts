@@ -10,7 +10,7 @@ import {
   PerspectiveCamera,
   Scene,
   SphereGeometry,
-  sRGBEncoding,
+  // sRGBEncoding removed in three.js r182+
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -171,7 +171,7 @@ export class Engine {
     renderer.autoClearColor = true;
     renderer.autoClearDepth = true;
     renderer.autoClearStencil = false;
-    renderer.outputEncoding = sRGBEncoding;
+    (renderer as any).colorSpace = 'srgb';
     return renderer;
   }
 
