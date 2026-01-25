@@ -311,6 +311,20 @@ export class Engine {
     });
     // Keyboard panning (WASD/arrow keys) using isometric mapping
     window.addEventListener('keydown', (e) => {
+      // Keyboard zoom controls
+      if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
+        if (e.key === '+' || e.key === '=' || e.key === 'PageUp') {
+          this.zoom = Math.min(this.maxZoom, this.zoom * 1.1);
+          this.updateCameraZoom();
+          e.preventDefault();
+          return;
+        } else if (e.key === '-' || e.key === '_' || e.key === 'PageDown') {
+          this.zoom = Math.max(this.minZoom, this.zoom * 0.9);
+          this.updateCameraZoom();
+          e.preventDefault();
+          return;
+        }
+      }
       // Use the same scaling as mouse drag for consistency
       const cam = this.camera as OrthographicCamera;
       const width = this.renderer.domElement.clientWidth;
