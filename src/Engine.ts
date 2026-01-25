@@ -1,9 +1,8 @@
-import type { RigidBody, World } from '@dimforge/rapier3d';
+import type { World } from '@dimforge/rapier3d';
 import {
   Clock,
   AmbientLight,
   MathUtils,
-  Mesh,
   PerspectiveCamera,
   OrthographicCamera,
   Camera,
