@@ -23,6 +23,15 @@ import { getRapier, Rapier } from './physics/rapier';
 const cameraOffset = new Vector3();
 
 /** Contains the three.js renderer and handles to important resources. */
+
+export interface EngineObjectConfig {
+  position: { x: number; y: number; z: number };
+  velocity?: { x: number; y: number; z: number };
+  attraction?: number; // If present, this object attracts others with this strength
+  color?: number;
+  fixed?: boolean; // If true, this object is static (fixed)
+}
+
 export class Engine {
   public readonly scene = new Scene();
   public readonly camera: Camera;
@@ -37,36 +46,27 @@ export class Engine {
   private frameId: number | null = null;
   private clock = new Clock();
   private sunlight: DirectionalLight;
-  // private terrain: TerrainShape[] = [];
   private physicsWorld?: World;
-  private sphere!: Mesh;
-  private sphereBody?: RigidBody;
-  private attractor!: Mesh;
-  private attractorBody?: RigidBody;
   private simulationStep: number = 0;
+  private objectConfigs: EngineObjectConfig[];
 
-  constructor(camera?: Camera) {
+  // Data-driven objects
+  private objects: {
+    mesh: Mesh;
+    body: RigidBody;
+    config: EngineObjectConfig;
+  }[] = [];
+
+  constructor(
+    objectConfigs: EngineObjectConfig[],
+    camera?: Camera
+  ) {
+    this.objectConfigs = objectConfigs;
     this.animate = this.animate.bind(this);
     this.camera = camera ?? new PerspectiveCamera(40, 1, 0.1, 100);
     this.sunlight = this.createSunlight();
     this.createAmbientLight();
     this.renderer = this.createRenderer();
-
-    // Main ball
-    const geometry = new SphereGeometry(1, 32, 16);
-    const material = new MeshStandardMaterial({ color: 0xffff00 });
-    this.sphere = new Mesh(geometry, material);
-    this.sphere.castShadow = true;
-    this.scene.add(this.sphere);
-
-    // Attractor ball (gravity source)
-    const attractorGeometry = new SphereGeometry(1, 32, 16);
-    const attractorMaterial = new MeshStandardMaterial({ color: 0x00aaff });
-    this.attractor = new Mesh(attractorGeometry, attractorMaterial);
-    this.attractor.castShadow = true;
-    this.scene.add(this.attractor);
-
-    // No terrain patches for 2D plane game.
 
     if (!camera) {
       cameraOffset.setFromSphericalCoords(20, MathUtils.degToRad(75), this.viewAngle);
@@ -105,38 +105,37 @@ export class Engine {
     // Create physics world with NO default gravity (all movement is custom)
     const gravity = new Vector3(0.0, 0.0, 0.0);
     this.physicsWorld = new r.World(gravity);
-    // No terrain physics
 
+    // Create all objects from configs
+    for (const config of this.objectConfigs) {
+      const geometry = new SphereGeometry(1, 32, 16);
+      const material = new MeshStandardMaterial({ color: config.color ?? 0xffff00 });
+      const mesh = new Mesh(geometry, material);
+      mesh.castShadow = true;
+      this.scene.add(mesh);
 
-    // Create rigid body for the main ball
-    const rbDesc = r.RigidBodyDesc.dynamic()
-      .setTranslation(0, 0, 0) // Centered in the plane
-      .setLinearDamping(2.0) // High damping for fluid/air effect
-      .setAngularDamping(2.0)
-      .setCcdEnabled(true)
-      .setAdditionalMass(1.0); // Explicitly set mass to 1.0
-    this.sphereBody = this.physicsWorld.createRigidBody(rbDesc);
-    // Give initial velocity in X direction (constrained to XZ plane)
-    this.sphereBody.setLinvel({ x: 30, y: 0, z: 0 }, true);
-    //this.sphereBody.applyImpulse({ x: 50000000, y: 0, z: 0 }, true); // Initial push
+      const isStatic = !!config.fixed;
+      const rbDesc = isStatic
+        ? r.RigidBodyDesc.fixed()
+        : r.RigidBodyDesc.dynamic()
+            .setLinearDamping(2.0)
+            .setAngularDamping(2.0)
+            .setCcdEnabled(true)
+            .setAdditionalMass(1.0);
+      rbDesc.setTranslation(config.position.x, config.position.y, config.position.z);
+      const body = this.physicsWorld.createRigidBody(rbDesc);
+      if (config.velocity) {
+        body.setLinvel(config.velocity, true);
+      }
+      const clDesc = this.rapier.ColliderDesc.ball(1)
+        .setFriction(0.1)
+        .setFrictionCombineRule(r.CoefficientCombineRule.Max)
+        .setRestitution(0.1)
+        .setRestitutionCombineRule(r.CoefficientCombineRule.Max);
+      this.physicsWorld.createCollider(clDesc, body);
 
-    const clDesc = this.rapier.ColliderDesc.ball(1)
-      .setFriction(0.1)
-      .setFrictionCombineRule(r.CoefficientCombineRule.Max)
-      .setRestitution(0.1) // Small bounce
-      .setRestitutionCombineRule(r.CoefficientCombineRule.Max);
-    this.physicsWorld.createCollider(clDesc, this.sphereBody);
-
-    // Create rigid body for the attractor (static so it does not move)
-    const attractorDesc = r.RigidBodyDesc.fixed()
-      .setTranslation(8, 0, 8);
-    this.attractorBody = this.physicsWorld.createRigidBody(attractorDesc);
-    const attractorClDesc = this.rapier.ColliderDesc.ball(1)
-      .setFriction(0.1)
-      .setFrictionCombineRule(r.CoefficientCombineRule.Max)
-      .setRestitution(0.1) // Small bounce
-      .setRestitutionCombineRule(r.CoefficientCombineRule.Max);
-    this.physicsWorld.createCollider(attractorClDesc, this.attractorBody);
+      this.objects.push({ mesh, body, config });
+    }
 
     if (!this.frameId) {
       this.clock.start();
@@ -164,39 +163,35 @@ export class Engine {
 
     // Run physics
     this.physicsWorld?.step();
-    // Constrain both balls to XZ plane (y=0)
-    if (this.sphereBody && this.attractorBody) {
-      // Apply gravity from attractor to sphere only if not overlapping
-      const t1 = this.sphereBody.translation();
-      const t2 = this.attractorBody.translation();
-      // Calculate direction vector in XZ plane
-      const dx = t2.x - t1.x;
-      const dz = t2.z - t1.z;
-      const distSq = dx * dx + dz * dz;
-      const minDist = 2; // sum of radii (1 + 1)
-      const epsilon = 1e-3;
-      if (distSq > (minDist + epsilon) * (minDist + epsilon)) {
-        // Apply a constant attraction force towards the attractor (halved)
-        const forceMag = 1; // Halved force magnitude
-        const dist = Math.sqrt(distSq);
-        const fx = (dx / dist) * forceMag;
-        const fz = (dz / dist) * forceMag;
-        if (this.simulationStep < 1000) {
-          this.sphereBody.applyImpulse({ x: fx, y: 0, z: fz }, true);
+
+    // Attraction logic: for each object with attraction, apply to all others
+    const epsilon = 1e-3;
+    const minDist = 2;
+    for (const obj of this.objects) {
+      if (!obj.config.attraction) continue;
+      for (const target of this.objects) {
+        if (obj === target) continue;
+        // Only apply to dynamic bodies
+        if (target.body.isFixed()) continue;
+        const t1 = target.body.translation();
+        const t2 = obj.body.translation();
+        const dx = t2.x - t1.x;
+        const dz = t2.z - t1.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > (minDist + epsilon) * (minDist + epsilon)) {
+          const dist = Math.sqrt(distSq);
+          const forceMag = obj.config.attraction;
+          const fx = (dx / dist) * forceMag;
+          const fz = (dz / dist) * forceMag;
+          target.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
         }
       }
-      // Only constrain Y to 0 if it drifts significantly (keep XZ free for collision)
-      const t1new = this.sphereBody.translation();
-      const t2new = this.attractorBody.translation();
-      // if (Math.abs(t1new.y) > 1e-4) {
-      //   this.sphereBody.setTranslation({ x: t1new.x, y: 0, z: t1new.z }, true);
-      // }
-      // if (Math.abs(t2new.y) > 1e-4) {
-      //   this.attractorBody.setTranslation({ x: t2new.x, y: 0, z: t2new.z }, true);
-      // }
-      this.sphere.position.set(t1new.x, 0, t1new.z);
-      this.attractor.position.set(t2new.x, 0, t2new.z);
+    }
 
+    // Update mesh positions
+    for (const obj of this.objects) {
+      const t = obj.body.translation();
+      obj.mesh.position.set(t.x, t.y, t.z);
     }
   }
 
