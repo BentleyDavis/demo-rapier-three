@@ -1,27 +1,23 @@
 import './index.css';
-import { OrbitControls } from 'three-stdlib';
+import { OrthographicCamera } from 'three';
 import { Engine } from './Engine';
 
 export function createApp() {
-  const engine = new Engine();
+  const aspect = window.innerWidth / window.innerHeight;
+  const d = 20;
+  const orthoCamera = new OrthographicCamera(
+    -d * aspect,
+    d * aspect,
+    d,
+    -d,
+    0.1,
+    1000
+  );
+  orthoCamera.position.set(8, 50, 8);
+  orthoCamera.lookAt(8, 0, 8);
+  const engine = new Engine(orthoCamera);
   const renderElt = document.getElementById('root')!;
-
   engine.attach(renderElt);
-
-  const orbitControls = new OrbitControls(engine.camera, renderElt);
-  orbitControls.listenToKeyEvents(renderElt); // optional
-
-  orbitControls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
-  orbitControls.dampingFactor = 0.05;
-  orbitControls.screenSpacePanning = false;
-  orbitControls.minDistance = 20;
-  orbitControls.maxDistance = 100;
-  orbitControls.maxPolarAngle = Math.PI / 2;
-
-  orbitControls.update();
-  engine.update.subscribe('update', () => {
-    orbitControls.update();
-  });
-
+  // No orbit controls for strict top-down 2D feel
   return engine;
 }
