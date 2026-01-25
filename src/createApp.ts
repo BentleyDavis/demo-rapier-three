@@ -1,37 +1,34 @@
 import './index.css';
 import { Engine, EngineConfig } from './Engine';
+import { AnyObjectData } from './items/objects';
 
 
 export function createApp() {
 
-  const objects = [
+  const objects: AnyObjectData[] = [
+    // {
+    //   type: 'ball',
+    //   position: { x: 0, y: 0, z: 0 },
+    //   color: 0xffff00,
+    //   fixed: false
+    // },
+    // {
+    //   type: 'ball',
+    //   position: { x: 2, y: 0, z: 2 },
+    //   color: 0xffff00,
+    //   fixed: false
+    // },
     {
+      type: 'attractor',
+      position: { x: 20, y: 0, z: 0 },
+      color: 0x00aaff,
+      attraction: 1,
+    },
+    {
+      type: 'attractor',
       position: { x: 0, y: 0, z: 0 },
-      velocity: { x: 30, y: 0, z: 0 },
-      color: 0xffff00,
-      attraction: 0,
-      fixed: false
-    },
-    {
-      position: { x: 2, y: 0, z: 2 },
-      velocity: { x: 0, y: 0, z: 20 },
-      color: 0xffff00,
-      attraction: 0,
-      fixed: false
-    },
-    {
-      position: { x: 8, y: 0, z: 8 },
-      velocity: undefined,
       color: 0x00aaff,
       attraction: 1,
-      fixed: true
-    },
-        {
-      position: { x: -2, y: 0, z: 0 },
-      velocity: undefined,
-      color: 0x00aaff,
-      attraction: 1,
-      fixed: true
     },
   ];
 
@@ -51,21 +48,14 @@ export function createApp() {
     const [r, g, b] = hslToRgb(hue, 80, 50);
     const color = (r << 16) | (g << 8) | b;
     objects.push({
-      position: { x: i, y: 0, z: 5 },
-      velocity: { x: 0, y: 0, z: 0 },
+      type: 'ball',
+      position: { x: i * 3, y: 0, z: 5 },
       color,
-      attraction: 0,
-      fixed: false
     });
   }
 
   const config: EngineConfig = {
     world: {
-      linearDamping: 2.0,
-      angularDamping: 2.0,
-      ccdEnabled: true,
-      friction: 0.2,
-      restitution: 0.6,
       camera: {
         position: { x: 30, y: 30, z: 30 },
         lookAt: { x: 0, y: 0, z: 0 }

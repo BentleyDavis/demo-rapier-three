@@ -4,42 +4,35 @@ import {
   AmbientLight,
   MathUtils,
   Mesh,
-  MeshStandardMaterial,
   PerspectiveCamera,
   OrthographicCamera,
   Camera,
   Scene,
-  SphereGeometry,
   DirectionalLight,
   Vector3,
   WebGLRenderer,
 } from 'three';
 import { getRapier, Rapier } from './physics/rapier';
+import { createFuncs, stepFuncs, AnyObject, AnyObjectData } from './items/objects';
 
 const cameraOffset = new Vector3();
 
-/** Contains the three.js renderer and handles to important resources. */
 
 export interface EngineConfig {
   world: {
-    linearDamping: number;
-    angularDamping: number;
-    ccdEnabled: boolean;
-    friction: number;
-    restitution: number;
     camera?: {
       position: { x: number; y: number; z: number };
       lookAt: { x: number; y: number; z: number };
     };
   };
-  objects: {
-    position: { x: number; y: number; z: number };
-    velocity?: { x: number; y: number; z: number };
-    attraction?: number;
-    color?: number;
-    fixed?: boolean;
-  }[];
+  objects: AnyObjectData[];
 }
+
+
+
+
+
+/** Contains the three.js renderer and handles to important resources. */
 
 export class Engine {
   public readonly scene = new Scene();
@@ -58,11 +51,7 @@ export class Engine {
   private config: EngineConfig;
 
   // Data-driven objects
-  private objects: {
-    mesh: Mesh;
-    body: RigidBody;
-    config: EngineConfig["objects"][number];
-  }[] = [];
+  private objects: AnyObject[] = [];
 
   constructor(
     config: EngineConfig,
@@ -75,7 +64,6 @@ export class Engine {
       this.camera = camera;
     } else {
       const camConfig = config.world.camera;
-      // Always use orthographic camera with default up and d if not provided
       if (camConfig) {
         const aspect = window.innerWidth / window.innerHeight;
         const d = 20;
@@ -147,38 +135,24 @@ export class Engine {
     // Create physics world with default zero gravity
     this.physicsWorld = new r.World(new Vector3(0, 0, 0));
 
-    // Create all objects from configs
+    // Create all objects from configs using the new object builder pattern
+    // Import objectBuilders and createFuncs from items/objects
+    // (Assume import { createFuncs } from './items/objects'; at the top if not present)
+    // Each object config should have a 'type' property to select the builder
     for (const objConfig of this.config.objects) {
-      const geometry = new SphereGeometry(1, 32, 32); // (radius, widthSegments, heightSegments)
-      const material = new MeshStandardMaterial({ color: objConfig.color ?? 0xffff00 });
-      const mesh = new Mesh(geometry, material);
-      mesh.rotation.x = Math.PI / 2; // Rotate to be parallel to the floor
-      mesh.castShadow = true;
-      this.scene.add(mesh);
-
-      const isStatic = !!objConfig.fixed;
-      let rbDesc;
-      if (isStatic) {
-        rbDesc = r.RigidBodyDesc.fixed();
+      // Determine the type of object to create
+      const type = objConfig.type;
+      const create = type && createFuncs[type] ? createFuncs[type] : null;
+      if (create) {
+        // Cast objConfig to the expected type for the builder
+        const result = create(objConfig as any, this.scene, this.physicsWorld!, this.rapier);
+        if (result && result.mesh && result.body) {
+          this.objects.push(result);
+        }
       } else {
-        rbDesc = r.RigidBodyDesc.dynamic()
-          .setLinearDamping(this.config.world.linearDamping)
-          .setAngularDamping(this.config.world.angularDamping)
-          .setCcdEnabled(this.config.world.ccdEnabled);
+        // No builder found for this type; log an error
+        console.error(`No object builder found for type: ${type}`, objConfig);
       }
-      rbDesc.setTranslation(objConfig.position.x, objConfig.position.y, objConfig.position.z);
-      const body = this.physicsWorld.createRigidBody(rbDesc);
-      if (objConfig.velocity) {
-        body.setLinvel(objConfig.velocity, true);
-      }
-      const clDesc = this.rapier.ColliderDesc.ball(1)
-        .setFriction(this.config.world.friction)
-        .setFrictionCombineRule(r.CoefficientCombineRule.Max)
-        .setRestitution(this.config.world.restitution)
-        .setRestitutionCombineRule(r.CoefficientCombineRule.Max);
-      this.physicsWorld.createCollider(clDesc, body);
-
-      this.objects.push({ mesh, body, config: objConfig });
     }
 
     if (!this.frameId) {
@@ -202,40 +176,21 @@ export class Engine {
     // Increment simulation step counter
     this.simulationStep++;
 
-    // Run physics
-    this.physicsWorld?.step();
-
-    // Attraction logic: for each object with attraction, apply to all others within a max distance, but not if touching (distance <= 2 * radius)
-    const epsilon = 1e-3;
-    const objectRadius = 1; // SphereGeometry(1, ...)
-    const minAttractDist = 2 * objectRadius; // touching if distance <= this
-    const maxAttractDist = 10 * objectRadius;
+    // Call step function for each object if available
     for (const obj of this.objects) {
-      if (!obj.config.attraction) continue;
-      for (const target of this.objects) {
-        if (obj === target) continue;
-        // Only apply to dynamic bodies
-        if (target.body.isFixed()) continue;
-        const t1 = target.body.translation();
-        const t2 = obj.body.translation();
-        const dx = t2.x - t1.x;
-        const dz = t2.z - t1.z;
-        const distSq = dx * dx + dz * dz;
-        if (distSq <= (maxAttractDist + epsilon) * (maxAttractDist + epsilon)) {
-          const dist = Math.sqrt(distSq);
-          // Skip if objects are touching or overlapping
-          if (dist > minAttractDist + epsilon) {
-            const forceMag = obj.config.attraction;
-            const fx = (dx / dist) * forceMag;
-            const fz = (dz / dist) * forceMag;
-            target.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
-          }
-        }
+      const type = obj.data.type;
+      const step = type && (stepFuncs[type] as Function | undefined);
+      if (step) {
+        step(obj, deltaTime, this.objects);
       }
     }
 
+    // Run physics
+    this.physicsWorld?.step();
+
     // Update mesh positions and reset y to zero
     for (const obj of this.objects) {
+      if (!obj.body || !obj.mesh) continue;
       const t = obj.body.translation();
       obj.mesh.position.set(t.x, 0, t.z);
     }
