@@ -47,7 +47,7 @@ function step(obj: AttractorObject, dt: number, allObjects?: BaseObject[], world
     const dz = t2.z - t1.z;
     const distSq = dx * dx + dz * dz;
     const minAttractDist = 2;
-    const maxAttractDist = 10;
+    const maxAttractDist = 20;
     if (distSq <= maxAttractDist * maxAttractDist) {
       const dist = Math.sqrt(distSq);
       if (dist > minAttractDist) {
