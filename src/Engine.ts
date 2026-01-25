@@ -43,7 +43,7 @@ export class Engine {
         if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
           e.preventDefault();
           // Zoom in/out
-          const zoomDelta = e.deltaY > 0 ? 1.1 : 0.9;
+          const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
           this.zoom *= zoomDelta;
           this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
           this.updateCameraZoom();

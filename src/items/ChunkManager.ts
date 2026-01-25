@@ -2,7 +2,8 @@
 // Deterministic chunk-based procedural generation with lazy loading and caching
 // Each chunk is generated from (globalSeed + chunkCoord) using a seeded PRNG
 
-import seedrandom from 'seedrandom';
+import { createNoise2D } from 'simplex-noise';
+import alea from 'alea';
 
 export type ChunkCoord = { x: number; y: number };
 export type ChunkData = any; // Replace with your actual chunk data type
@@ -11,27 +12,31 @@ export class ChunkManager {
   private globalSeed: string;
   private chunkSize: number;
   private cache: Map<string, ChunkData>;
+  private noise2D: (x: number, y: number) => number;
 
   constructor(globalSeed: string, chunkSize: number = 32) {
     this.globalSeed = globalSeed;
     this.chunkSize = chunkSize;
     this.cache = new Map();
+    // Use the global seed to seed the simplex noise generator (official API)
+    this.noise2D = createNoise2D(alea(globalSeed));
   }
 
   private chunkKey(coord: ChunkCoord): string {
     return `${coord.x},${coord.y}`;
   }
 
-  // Deterministically generate chunk data from globalSeed and chunk coordinates
+  // Deterministically generate chunk data from globalSeed and chunk coordinates using Simplex noise
   private generateChunk(coord: ChunkCoord): ChunkData {
-    const seed = `${this.globalSeed}:${coord.x},${coord.y}`;
-    const rng = seedrandom(seed);
-    // Example: generate 2D array of random values
     const data = [];
+    const baseX = coord.x * this.chunkSize;
+    const baseY = coord.y * this.chunkSize;
     for (let i = 0; i < this.chunkSize; i++) {
       const row = [];
       for (let j = 0; j < this.chunkSize; j++) {
-        row.push(rng());
+        // Use simplex noise, normalized to [0,1]
+        const noise = this.noise2D(baseX + i, baseY + j);
+        row.push((noise + 1) / 2);
       }
       data.push(row);
     }
