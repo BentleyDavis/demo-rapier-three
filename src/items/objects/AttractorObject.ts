@@ -13,36 +13,24 @@ export interface AttractorObject extends BaseObject {
 }
 
 function create(data: AttractorObjectData, scene: Scene, world: World, rapier: Rapier): AttractorObject {
-  // Cylinder: radiusTop, radiusBottom, height, radialSegments
   const geometry = new CylinderGeometry(1, 1, 2, 32);
   const material = new MeshStandardMaterial({ color: data.color ?? 0xff00ff });
   const mesh = new Mesh(geometry, material);
-  mesh.castShadow = true;
   scene.add(mesh);
   const rbDesc = rapier.RigidBodyDesc.fixed();
   rbDesc.setTranslation(data.position.x, data.position.y, data.position.z);
   const body = world.createRigidBody(rbDesc);
-  // Rapier cylinder: halfHeight, radius
-  const clDesc = rapier.ColliderDesc.cylinder(1, 1); // halfHeight=1, radius=1
-  world.createCollider(clDesc, body);
-  const obj = { data, mesh, body };
+  const clDesc = rapier.ColliderDesc.cylinder(1, 1);
+  clDesc.setActiveEvents(1); // COLLISION_EVENTS = 1
+  const collider = world.createCollider(clDesc, body);
+  const obj = { data, mesh, body, collider };
   configureBaseObjectPhysics(obj);
   return obj;
 }
 
-function step(obj: AttractorObject, dt: number, allObjects?: BaseObject[]) {
+function step(obj: AttractorObject, dt: number, allObjects?: BaseObject[], world?: World) {
   if (!allObjects) return;
   for (const target of allObjects) {
-    // if (
-    //   target === obj ||
-    //   !target ||
-    //   typeof target !== 'object' ||
-    //   !('data' in target) ||
-    //   !target.data ||
-    //   target.data.type !== 'ball' ||
-    //   !target.body ||
-    //   !obj.body
-    // ) continue;
     if (target.body.isFixed()) continue;
     const t1 = target.body.translation();
     const t2 = obj.body.translation();
@@ -62,5 +50,6 @@ function step(obj: AttractorObject, dt: number, allObjects?: BaseObject[]) {
     }
   }
 }
+
 
 export const AttractorBuilder = { type: 'attractor', create, step };

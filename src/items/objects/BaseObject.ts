@@ -1,4 +1,4 @@
-import type { RigidBody } from '@dimforge/rapier3d';
+import type { RigidBody, Collider } from '@dimforge/rapier3d';
 import type { Mesh } from 'three';
 
 /**
@@ -21,6 +21,7 @@ export function configureBaseObjectPhysics(
   const angularDamping = options?.angularDamping ?? 0.5;
   obj.body.setLinearDamping(linearDamping);
   obj.body.setAngularDamping(angularDamping);
+  obj.mesh.castShadow = true;
   // Extend with more property setters as needed
 }
 
@@ -36,4 +37,5 @@ export interface BaseObject {
   data: BaseObjectData;
   mesh: Mesh;
   body: RigidBody;
+  collider: Collider;
 }

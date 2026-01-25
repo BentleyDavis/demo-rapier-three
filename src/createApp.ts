@@ -6,18 +6,6 @@ import { AnyObjectData } from './items/objects';
 export function createApp() {
 
   const objects: AnyObjectData[] = [
-    // {
-    //   type: 'ball',
-    //   position: { x: 0, y: 0, z: 0 },
-    //   color: 0xffff00,
-    //   fixed: false
-    // },
-    // {
-    //   type: 'ball',
-    //   position: { x: 2, y: 0, z: 2 },
-    //   color: 0xffff00,
-    //   fixed: false
-    // },
     {
       type: 'attractor',
       position: { x: 20, y: 0, z: 0 },
@@ -29,6 +17,12 @@ export function createApp() {
       position: { x: 0, y: 0, z: 0 },
       color: 0x00aaff,
       attraction: 1,
+    },
+    {
+      type: 'bumper',
+      position: { x: 18, y: 0, z: 0 },
+      color: 0xffaa00,
+      bumpStrength: 10,
     },
   ];
 

@@ -46,6 +46,7 @@ export class Engine {
   private clock = new Clock();
   // Sunlight (DirectionalLight) will be added back in
   private physicsWorld?: World;
+  private eventQueue?: any;
   private simulationStep: number = 0;
   private config: EngineConfig;
 
@@ -133,6 +134,7 @@ export class Engine {
 
     // Create physics world with default zero gravity
     this.physicsWorld = new r.World(new Vector3(0, 0, 0));
+    this.eventQueue = new r.EventQueue(true);
 
     // Create all objects from configs using the new object builder pattern
     // Import objectBuilders and createFuncs from items/objects
@@ -175,17 +177,42 @@ export class Engine {
     // Increment simulation step counter
     this.simulationStep++;
 
-    // Call step function for each object if available
+    // Call step function for each object if available, always pass physicsWorld
     for (const obj of this.objects) {
       const type = obj.data.type;
       const step = type && (stepFuncs[type] as Function | undefined);
       if (step) {
-        step(obj, deltaTime, this.objects);
+        step(obj, deltaTime, this.objects, this.physicsWorld);
       }
     }
 
-    // Run physics
-    this.physicsWorld?.step();
+    // Run physics and handle contact events
+    if (this.physicsWorld && this.eventQueue) {
+      this.physicsWorld.step(this.eventQueue);
+      // Handle contact events for bumpers
+      this.eventQueue.drainCollisionEvents((handle1: number, handle2: number, started: boolean) => {
+        if (!started) return;
+        // Log all collision events for debugging
+        const obj1 = this.objects.find(obj => obj.collider.handle === handle1);
+        const obj2 = this.objects.find(obj => obj.collider.handle === handle2);
+        console.log('Collision event:', { handle1, handle2, obj1Type: obj1?.data.type, obj2Type: obj2?.data.type });
+        // Find bumper and ball objects by collider handle
+        const bumper = this.objects.find(obj => obj.data.type === 'bumper' && (obj.collider.handle === handle1 || obj.collider.handle === handle2));
+        const ball = this.objects.find(obj => obj.data.type === 'ball' && (obj.collider.handle === handle1 || obj.collider.handle === handle2));
+        if (bumper && ball && bumper.data.type === 'bumper') {
+          // Apply impulse from bumper to ball
+          const t1 = ball.body.translation();
+          const t2 = bumper.body.translation();
+          const dx = t1.x - t2.x;
+          const dz = t1.z - t2.z;
+          const dist = Math.sqrt(dx * dx + dz * dz) || 0.01;
+          const forceMag = (bumper.data as any).bumpStrength * 3;
+          const fx = (dx / dist) * forceMag;
+          const fz = (dz / dist) * forceMag;
+          ball.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
+        }
+      });
+    }
 
     // Update mesh positions and reset y to zero
     for (const obj of this.objects) {
