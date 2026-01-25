@@ -24,12 +24,21 @@ const cameraOffset = new Vector3();
 
 /** Contains the three.js renderer and handles to important resources. */
 
-export interface EngineObjectConfig {
-  position: { x: number; y: number; z: number };
-  velocity?: { x: number; y: number; z: number };
-  attraction?: number; // If present, this object attracts others with this strength
-  color?: number;
-  fixed?: boolean; // If true, this object is static (fixed)
+export interface EngineConfig {
+  world: {
+    linearDamping: number;
+    angularDamping: number;
+    ccdEnabled: boolean;
+    friction: number;
+    restitution: number;
+  };
+  objects: {
+    position: { x: number; y: number; z: number };
+    velocity?: { x: number; y: number; z: number };
+    attraction?: number;
+    color?: number;
+    fixed?: boolean;
+  }[];
 }
 
 export class Engine {
@@ -48,20 +57,20 @@ export class Engine {
   private sunlight: DirectionalLight;
   private physicsWorld?: World;
   private simulationStep: number = 0;
-  private objectConfigs: EngineObjectConfig[];
+  private config: EngineConfig;
 
   // Data-driven objects
   private objects: {
     mesh: Mesh;
     body: RigidBody;
-    config: EngineObjectConfig;
+    config: EngineConfig["objects"][number];
   }[] = [];
 
   constructor(
-    objectConfigs: EngineObjectConfig[],
+    config: EngineConfig,
     camera?: Camera
   ) {
-    this.objectConfigs = objectConfigs;
+    this.config = config;
     this.animate = this.animate.bind(this);
     this.camera = camera ?? new PerspectiveCamera(40, 1, 0.1, 100);
     this.sunlight = this.createSunlight();
@@ -98,43 +107,45 @@ export class Engine {
     mount.appendChild(this.renderer.domElement);
     this.onWindowResize();
 
+
     // Make sure physics WASM bundle is initialized before starting rendering loop.
     // Physics objects cannot be created until after physics engine is initialized.
     const r = (this.rapier = await getRapier());
 
-    // Create physics world with NO default gravity (all movement is custom)
-    const gravity = new Vector3(0.0, 0.0, 0.0);
-    this.physicsWorld = new r.World(gravity);
+    // Create physics world with default zero gravity
+    this.physicsWorld = new r.World(new Vector3(0, 0, 0));
 
     // Create all objects from configs
-    for (const config of this.objectConfigs) {
+    for (const objConfig of this.config.objects) {
       const geometry = new SphereGeometry(1, 32, 16);
-      const material = new MeshStandardMaterial({ color: config.color ?? 0xffff00 });
+      const material = new MeshStandardMaterial({ color: objConfig.color ?? 0xffff00 });
       const mesh = new Mesh(geometry, material);
       mesh.castShadow = true;
       this.scene.add(mesh);
 
-      const isStatic = !!config.fixed;
-      const rbDesc = isStatic
-        ? r.RigidBodyDesc.fixed()
-        : r.RigidBodyDesc.dynamic()
-            .setLinearDamping(2.0)
-            .setAngularDamping(2.0)
-            .setCcdEnabled(true)
-            .setAdditionalMass(1.0);
-      rbDesc.setTranslation(config.position.x, config.position.y, config.position.z);
+      const isStatic = !!objConfig.fixed;
+      let rbDesc;
+      if (isStatic) {
+        rbDesc = r.RigidBodyDesc.fixed();
+      } else {
+        rbDesc = r.RigidBodyDesc.dynamic()
+          .setLinearDamping(this.config.world.linearDamping)
+          .setAngularDamping(this.config.world.angularDamping)
+          .setCcdEnabled(this.config.world.ccdEnabled);
+      }
+      rbDesc.setTranslation(objConfig.position.x, objConfig.position.y, objConfig.position.z);
       const body = this.physicsWorld.createRigidBody(rbDesc);
-      if (config.velocity) {
-        body.setLinvel(config.velocity, true);
+      if (objConfig.velocity) {
+        body.setLinvel(objConfig.velocity, true);
       }
       const clDesc = this.rapier.ColliderDesc.ball(1)
-        .setFriction(0.1)
+        .setFriction(this.config.world.friction)
         .setFrictionCombineRule(r.CoefficientCombineRule.Max)
-        .setRestitution(0.1)
+        .setRestitution(this.config.world.restitution)
         .setRestitutionCombineRule(r.CoefficientCombineRule.Max);
       this.physicsWorld.createCollider(clDesc, body);
 
-      this.objects.push({ mesh, body, config });
+      this.objects.push({ mesh, body, config: objConfig });
     }
 
     if (!this.frameId) {
@@ -164,9 +175,10 @@ export class Engine {
     // Run physics
     this.physicsWorld?.step();
 
-    // Attraction logic: for each object with attraction, apply to all others
+    // Attraction logic: for each object with attraction, apply to all others within a max distance (2x radius)
     const epsilon = 1e-3;
-    const minDist = 2;
+    const objectRadius = 1; // SphereGeometry(1, ...)
+    const maxAttractDist = 10 * objectRadius;
     for (const obj of this.objects) {
       if (!obj.config.attraction) continue;
       for (const target of this.objects) {
@@ -178,20 +190,22 @@ export class Engine {
         const dx = t2.x - t1.x;
         const dz = t2.z - t1.z;
         const distSq = dx * dx + dz * dz;
-        if (distSq > (minDist + epsilon) * (minDist + epsilon)) {
+        if (distSq <= (maxAttractDist + epsilon) * (maxAttractDist + epsilon)) {
           const dist = Math.sqrt(distSq);
-          const forceMag = obj.config.attraction;
-          const fx = (dx / dist) * forceMag;
-          const fz = (dz / dist) * forceMag;
-          target.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
+          if (dist > epsilon) {
+            const forceMag = obj.config.attraction;
+            const fx = (dx / dist) * forceMag;
+            const fz = (dz / dist) * forceMag;
+            target.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
+          }
         }
       }
     }
 
-    // Update mesh positions
+    // Update mesh positions and reset y to zero
     for (const obj of this.objects) {
       const t = obj.body.translation();
-      obj.mesh.position.set(t.x, t.y, t.z);
+      obj.mesh.position.set(t.x, 0, t.z);
     }
   }
 
@@ -249,7 +263,7 @@ export class Engine {
   }
 
   private createSunlight() {
-    const sunlight = new DirectionalLight(new Color('#ffffff').convertSRGBToLinear(), 2); // Increased intensity
+    const sunlight = new DirectionalLight(new Color('#ffffff').convertSRGBToLinear(), 1); // Increased intensity
     sunlight.castShadow = true;
     sunlight.shadow.mapSize.width = 1024;
     sunlight.shadow.mapSize.height = 1024;
@@ -268,7 +282,7 @@ export class Engine {
     const light = new HemisphereLight(
       new Color(0xb1e1ff).multiplyScalar(0.4).convertSRGBToLinear(), // Increased sky color intensity
       new Color(0xb97a20).multiplyScalar(0.4).convertSRGBToLinear(), // Increased ground color intensity
-      1.2 // Increased overall intensity
+      8 // Increased overall intensity
     );
     this.scene.add(light);
     return light;
