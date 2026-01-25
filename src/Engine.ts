@@ -274,31 +274,50 @@ export class Engine {
     window.addEventListener('mouseup', () => {
       this.isPanning = false;
     });
-    // Keyboard panning (WASD/arrow keys)
+    // Keyboard panning (WASD/arrow keys) using isometric mapping
     window.addEventListener('keydown', (e) => {
-      const move = 5;
+      // Use the same scaling as mouse drag for consistency
+      const cam = this.camera as OrthographicCamera;
+      const width = this.renderer.domElement.clientWidth;
+      const height = this.renderer.domElement.clientHeight;
+      const worldPerPixelX = (cam.right - cam.left) / width;
+      const worldPerPixelY = Math.abs((cam.top - cam.bottom) / height);
+      const keyStep = 20; // Number of pixels to simulate per key press
+      let dx = 0, dy = 0;
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
         case 'W':
-          this.panTarget.z -= move;
+          dy = -keyStep;
           break;
         case 'ArrowDown':
         case 's':
         case 'S':
-          this.panTarget.z += move;
+          dy = keyStep;
           break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
-          this.panTarget.x -= move;
+          dx = -keyStep;
           break;
         case 'ArrowRight':
         case 'd':
         case 'D':
-          this.panTarget.x += move;
+          dx = keyStep;
           break;
+        default:
+          return;
       }
+      // Use the same isometric mapping as mouse
+      const worldDx = dx * worldPerPixelX;
+      const worldDy = dy * worldPerPixelY;
+      const isoX = { x: -Math.cos(isoAzimuth), z: Math.sin(isoAzimuth) };
+      const isoY = { x: -Math.cos(isoAzimuth), z: -Math.sin(isoAzimuth) };
+      const axisLen = Math.sqrt(isoX.x * isoX.x + isoX.z * isoX.z);
+      const verticalPanMultiplier = 2.0;
+      const verticalBoost = Math.SQRT2 * verticalPanMultiplier;
+      this.panTarget.x -= (worldDx * isoX.x + (worldDy * verticalBoost) * isoY.x) / axisLen;
+      this.panTarget.z -= (worldDx * isoX.z + (worldDy * verticalBoost) * isoY.z) / axisLen;
     });
   }
 

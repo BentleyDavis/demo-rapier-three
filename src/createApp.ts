@@ -26,14 +26,14 @@ export function createApp() {
         for (let j = 0; j < chunkSize; j++) {
           const value = chunkData[i][j];
           const pos = { x: cx * chunkSize + i, y: 0, z: cy * chunkSize + j };
-          if (value > 0.995) {
+          if (value > 0.990) {
             // Ball
             objects.push({
               type: 'ball',
               position: pos,
               color: 0x00aaff,
             });
-          } else if (value > 0.990) {
+          } else if (value > 0.980) {
             // Bumper
             objects.push({
               type: 'bumper',
@@ -41,7 +41,7 @@ export function createApp() {
               color: 0xffaa00,
               bumpStrength: 10, // Default strength, adjust as needed
             });
-          } else if (value > 0.985) {
+          } else if (value > 0.970) {
             // Attractor
             objects.push({
               type: 'attractor',
