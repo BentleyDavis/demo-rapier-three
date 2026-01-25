@@ -11,6 +11,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+// No OrbitControls for orthogonal 2.5D movement
 import { getRapier, Rapier } from './physics/rapier';
 import { createFuncs, stepFuncs, AnyObject, AnyObjectData } from './items/objects';
 
@@ -40,6 +41,10 @@ export class Engine {
   public readonly viewPosition = new Vector3();
   public viewAngle = 0;
   public rapier!: Rapier;
+  // Camera pan state for orthogonal movement
+  private panTarget = new Vector3(0, 0, 0);
+  private isPanning = false;
+  private lastPan = { x: 0, y: 0 };
 
   private mount: HTMLElement | undefined;
   private frameId: number | null = null;
@@ -91,6 +96,8 @@ export class Engine {
     this.createAmbientLight();
     this.createSunLight();
     this.renderer = this.createRenderer();
+    // Set up event listeners for orthogonal camera panning
+    this.setupPanControls();
   }
 
   /** Adds a sun (directional light) to the scene. */
@@ -126,6 +133,7 @@ export class Engine {
     window.addEventListener('resize', this.onWindowResize.bind(this));
     mount.appendChild(this.renderer.domElement);
     this.onWindowResize();
+    // No controls to re-attach for orthogonal camera
 
 
     // Make sure physics WASM bundle is initialized before starting rendering loop.
@@ -218,8 +226,98 @@ export class Engine {
   private animate() {
     const deltaTime = Math.min(this.clock.getDelta(), 0.1);
     this.updateScene(deltaTime);
+    this.updateCameraPan();
     this.render();
     this.frameId = window.requestAnimationFrame(this.animate);
+  }
+
+  // Set up mouse and keyboard panning for orthogonal camera
+  private setupPanControls() {
+    const canvas = this.renderer.domElement;
+    // Mouse drag panning (map to isometric XZ plane)
+    const isoAzimuth = Math.PI / 4;
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        this.isPanning = true;
+        this.lastPan.x = e.clientX;
+        this.lastPan.y = e.clientY;
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (this.isPanning && 'isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
+        const dx = e.clientX - this.lastPan.x;
+        const dy = e.clientY - this.lastPan.y;
+        // Calculate world units per pixel
+        const cam = this.camera as OrthographicCamera;
+        const width = this.renderer.domElement.clientWidth;
+        const height = this.renderer.domElement.clientHeight;
+        const worldPerPixelX = (cam.right - cam.left) / width;
+        const worldPerPixelY = Math.abs((cam.top - cam.bottom) / height);
+        // Map screen movement to world XZ axes for isometric view
+        // Normalize so up/down and left/right have equal speed
+        const worldDx = dx * worldPerPixelX;
+        const worldDy = dy * worldPerPixelY;
+        // Isometric axes unit vectors
+        const isoX = { x: -Math.cos(isoAzimuth), z: Math.sin(isoAzimuth) };
+        const isoY = { x: -Math.cos(isoAzimuth), z: -Math.sin(isoAzimuth) };
+        // Normalize axis length
+        const axisLen = Math.sqrt(isoX.x * isoX.x + isoX.z * isoX.z);
+        // Apply normalized mapping, with user-tunable vertical panning multiplier for best feel
+        const verticalPanMultiplier = 1.25; // Increase if up/down is too slow
+        const verticalBoost = Math.SQRT2 * verticalPanMultiplier;
+        this.panTarget.x += (worldDx * isoX.x + (worldDy * verticalBoost) * isoY.x) / axisLen;
+        this.panTarget.z += (worldDx * isoX.z + (worldDy * verticalBoost) * isoY.z) / axisLen;
+        this.lastPan.x = e.clientX;
+        this.lastPan.y = e.clientY;
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      this.isPanning = false;
+    });
+    // Keyboard panning (WASD/arrow keys)
+    window.addEventListener('keydown', (e) => {
+      const move = 5;
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          this.panTarget.z -= move;
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          this.panTarget.z += move;
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          this.panTarget.x -= move;
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          this.panTarget.x += move;
+          break;
+      }
+    });
+  }
+
+  // Update camera position to follow panTarget, always looking down at same angle
+  private updateCameraPan() {
+    if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
+          // True isometric: fixed azimuth and elevation
+          const cam = this.camera;
+          const isoAzimuth = Math.PI / 4; // 45 degrees
+          const isoElevation = Math.atan(1 / Math.sqrt(2)); // ~35.26 degrees
+          const dist = 40;
+          // Calculate camera position in isometric direction
+          const camX = this.panTarget.x + dist * Math.cos(isoElevation) * Math.cos(isoAzimuth);
+          const camY = this.panTarget.y + dist * Math.sin(isoElevation);
+          const camZ = this.panTarget.z + dist * Math.cos(isoElevation) * Math.sin(isoAzimuth);
+          cam.position.set(camX, camY, camZ);
+          cam.lookAt(this.panTarget.x, this.panTarget.y, this.panTarget.z);
+          cam.updateMatrixWorld();
+    }
   }
 
   /** Render the scene. */
