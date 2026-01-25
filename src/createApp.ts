@@ -1,24 +1,9 @@
 import './index.css';
-import { OrthographicCamera } from 'three';
-
 import { Engine, EngineConfig } from './Engine';
 
+
 export function createApp() {
-  const aspect = window.innerWidth / window.innerHeight;
-  const d = 20;
-  const orthoCamera = new OrthographicCamera(
-    -d * aspect,
-    d * aspect,
-    d,
-    -d,
-    0.1,
-    1000
-  );
-  orthoCamera.position.set(8, 50, 8);
-  orthoCamera.lookAt(8, 0, 8);
 
-
-  
   const objects = [
     {
       position: { x: 0, y: 0, z: 0 },
@@ -79,12 +64,16 @@ export function createApp() {
       linearDamping: 2.0,
       angularDamping: 2.0,
       ccdEnabled: true,
-      friction: 0.0, // No friction
-      restitution: 0.5 // Perfectly elastic collisions
+      friction: 0.2,
+      restitution: 0.6,
+      camera: {
+        position: { x: 30, y: 30, z: 30 },
+        lookAt: { x: 0, y: 0, z: 0 }
+      }
     },
     objects
   };
-  const engine = new Engine(config, orthoCamera);
+  const engine = new Engine(config);
   const renderElt = document.getElementById('root')!;
   engine.attach(renderElt);
   // No orbit controls for strict top-down 2D feel

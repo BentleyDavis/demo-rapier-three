@@ -1,9 +1,7 @@
 import type { RigidBody, World } from '@dimforge/rapier3d';
 import {
   Clock,
-  Color,
-  DirectionalLight,
-  HemisphereLight,
+  AmbientLight,
   MathUtils,
   Mesh,
   MeshStandardMaterial,
@@ -12,13 +10,11 @@ import {
   Camera,
   Scene,
   SphereGeometry,
-  // sRGBEncoding removed in three.js r182+
+  DirectionalLight,
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { EventSource, ResourcePool } from './lib';
 import { getRapier, Rapier } from './physics/rapier';
-// import { TerrainShape } from './terrain/TerrainShape';
 
 const cameraOffset = new Vector3();
 
@@ -31,6 +27,10 @@ export interface EngineConfig {
     ccdEnabled: boolean;
     friction: number;
     restitution: number;
+    camera?: {
+      position: { x: number; y: number; z: number };
+      lookAt: { x: number; y: number; z: number };
+    };
   };
   objects: {
     position: { x: number; y: number; z: number };
@@ -45,16 +45,14 @@ export class Engine {
   public readonly scene = new Scene();
   public readonly camera: Camera;
   public readonly renderer: WebGLRenderer;
-  public readonly pool = new ResourcePool();
   public readonly viewPosition = new Vector3();
   public viewAngle = 0;
-  public readonly update = new EventSource<{ update: number }>();
   public rapier!: Rapier;
 
   private mount: HTMLElement | undefined;
   private frameId: number | null = null;
   private clock = new Clock();
-  private sunlight: DirectionalLight;
+  // Sunlight (DirectionalLight) will be added back in
   private physicsWorld?: World;
   private simulationStep: number = 0;
   private config: EngineConfig;
@@ -72,22 +70,56 @@ export class Engine {
   ) {
     this.config = config;
     this.animate = this.animate.bind(this);
-    this.camera = camera ?? new PerspectiveCamera(40, 1, 0.1, 100);
-    this.sunlight = this.createSunlight();
-    this.createAmbientLight();
-    this.renderer = this.createRenderer();
-
-    if (!camera) {
-      cameraOffset.setFromSphericalCoords(20, MathUtils.degToRad(75), this.viewAngle);
-      this.camera.position.copy(this.viewPosition).add(cameraOffset);
-      this.camera.lookAt(this.viewPosition);
-      this.camera.updateMatrixWorld();
+    // Camera creation logic
+    if (camera) {
+      this.camera = camera;
+    } else {
+      const camConfig = config.world.camera;
+      // Always use orthographic camera with default up and d if not provided
+      if (camConfig) {
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 20;
+        const orthoCamera = new OrthographicCamera(
+          -d * aspect,
+          d * aspect,
+          d,
+          -d,
+          0.1,
+          1000
+        );
+        orthoCamera.position.set(camConfig.position.x, camConfig.position.y, camConfig.position.z);
+        orthoCamera.lookAt(camConfig.lookAt.x, camConfig.lookAt.y, camConfig.lookAt.z);
+        orthoCamera.up.set(0, 1, 0);
+        this.camera = orthoCamera;
+      } else {
+        // Fallback to perspective camera
+        this.camera = new PerspectiveCamera(40, 1, 0.1, 100);
+        cameraOffset.setFromSphericalCoords(20, MathUtils.degToRad(75), this.viewAngle);
+        this.camera.position.copy(this.viewPosition).add(cameraOffset);
+        this.camera.lookAt(this.viewPosition);
+        this.camera.updateMatrixWorld();
+      }
     }
+    this.createAmbientLight();
+    this.createSunLight();
+    this.renderer = this.createRenderer();
+  }
+
+  /** Adds a sun (directional light) to the scene. */
+  public createSunLight() {
+    const sun = new DirectionalLight(0xffffff, 1.2);
+    sun.position.set(30, 30, 0);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 100;
+    this.scene.add(sun);
+    return sun;
   }
 
   /** Shut down the renderer and release all resources. */
   public dispose() {
-    this.pool.dispose();
     if (this.frameId) {
       cancelAnimationFrame(this.frameId);
       this.frameId = null;
@@ -117,9 +149,10 @@ export class Engine {
 
     // Create all objects from configs
     for (const objConfig of this.config.objects) {
-      const geometry = new SphereGeometry(1, 32, 16);
+      const geometry = new SphereGeometry(1, 32, 32); // (radius, widthSegments, heightSegments)
       const material = new MeshStandardMaterial({ color: objConfig.color ?? 0xffff00 });
       const mesh = new Mesh(geometry, material);
+      mesh.rotation.x = Math.PI / 2; // Rotate to be parallel to the floor
       mesh.castShadow = true;
       this.scene.add(mesh);
 
@@ -166,18 +199,16 @@ export class Engine {
 
   /** Update the positions of any moving objects. */
   public updateScene(deltaTime: number) {
-    // Run callbacks.
-    this.update.emit('update', deltaTime);
-
     // Increment simulation step counter
     this.simulationStep++;
 
     // Run physics
     this.physicsWorld?.step();
 
-    // Attraction logic: for each object with attraction, apply to all others within a max distance (2x radius)
+    // Attraction logic: for each object with attraction, apply to all others within a max distance, but not if touching (distance <= 2 * radius)
     const epsilon = 1e-3;
     const objectRadius = 1; // SphereGeometry(1, ...)
+    const minAttractDist = 2 * objectRadius; // touching if distance <= this
     const maxAttractDist = 10 * objectRadius;
     for (const obj of this.objects) {
       if (!obj.config.attraction) continue;
@@ -192,7 +223,8 @@ export class Engine {
         const distSq = dx * dx + dz * dz;
         if (distSq <= (maxAttractDist + epsilon) * (maxAttractDist + epsilon)) {
           const dist = Math.sqrt(distSq);
-          if (dist > epsilon) {
+          // Skip if objects are touching or overlapping
+          if (dist > minAttractDist + epsilon) {
             const forceMag = obj.config.attraction;
             const fx = (dx / dist) * forceMag;
             const fz = (dz / dist) * forceMag;
@@ -223,7 +255,6 @@ export class Engine {
 
   /** Render the scene. */
   public render() {
-    this.adjustLightPosition();
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -262,40 +293,10 @@ export class Engine {
     return renderer;
   }
 
-  private createSunlight() {
-    const sunlight = new DirectionalLight(new Color('#ffffff').convertSRGBToLinear(), 1); // Increased intensity
-    sunlight.castShadow = true;
-    sunlight.shadow.mapSize.width = 1024;
-    sunlight.shadow.mapSize.height = 1024;
-    sunlight.shadow.camera.near = 1;
-    sunlight.shadow.camera.far = 32;
-    sunlight.shadow.camera.left = -15;
-    sunlight.shadow.camera.right = 15;
-    sunlight.shadow.camera.top = 15;
-    sunlight.shadow.camera.bottom = -15;
-    this.scene.add(sunlight);
-    this.scene.add(sunlight.target);
-    return sunlight;
-  }
-
   public createAmbientLight() {
-    const light = new HemisphereLight(
-      new Color(0xb1e1ff).multiplyScalar(0.4).convertSRGBToLinear(), // Increased sky color intensity
-      new Color(0xb97a20).multiplyScalar(0.4).convertSRGBToLinear(), // Increased ground color intensity
-      8 // Increased overall intensity
-    );
+    const light = new AmbientLight(0xffffff, 0.3);
     this.scene.add(light);
     return light;
   }
 
-  private adjustLightPosition() {
-    // Adjust shadow map bounds
-    const lightPos = this.sunlight.target.position;
-    lightPos.copy(this.viewPosition);
-
-    // Quantizing the light's location reduces the amount of shadow jitter.
-    lightPos.x = Math.round(lightPos.x);
-    lightPos.z = Math.round(lightPos.z);
-    this.sunlight.position.set(lightPos.x + 6, lightPos.y + 8, lightPos.z + 4);
-  }
 }
