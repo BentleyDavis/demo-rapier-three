@@ -14,8 +14,8 @@ export interface BumperObject extends BaseObject {
 }
 
 function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapier): BumperObject {
-  const geometry = new CylinderGeometry(1, 1, 2, 32);
-  const material = new MeshStandardMaterial({ color: data.color ?? 0xffaa00 });
+  const geometry = new CylinderGeometry(1, 1, 1.9, 32);
+  const material = new MeshStandardMaterial({ color: 0xffaa00 });
   const mesh = new Mesh(geometry, material);
   scene.add(mesh);
   const rbDesc = rapier.RigidBodyDesc.fixed();

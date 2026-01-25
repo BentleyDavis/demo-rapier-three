@@ -30,7 +30,6 @@ export function configureBaseObjectPhysics(
 export interface BaseObjectData {
   type: string;
   position: { x: number; y: number; z: number };
-  color?: number;
 }
 
 export interface BaseObject {

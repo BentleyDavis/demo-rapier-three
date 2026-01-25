@@ -15,7 +15,7 @@ export interface AttractorObject extends BaseObject {
 
 function create(data: AttractorObjectData, scene: Scene, world: World, rapier: Rapier): AttractorObject {
   const geometry = new CylinderGeometry(1, 1, 2, 32);
-  const material = new MeshStandardMaterial({ color: data.color ?? 0xff00ff });
+  const material = new MeshStandardMaterial({ color: 0xff00ff });
   const mesh = new Mesh(geometry, material);
   scene.add(mesh);
   const rbDesc = rapier.RigidBodyDesc.fixed();

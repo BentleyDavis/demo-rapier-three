@@ -6,6 +6,7 @@ import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseOb
 export interface BallObjectData extends BaseObjectData {
   type: 'ball';
   fixed?: boolean;
+  color?: number;
 }
 
 export interface BallObject extends BaseObject {

@@ -2,7 +2,13 @@ import './index.css';
 import { Engine, EngineConfig } from './Engine';
 
 import { AnyObjectData } from './items/objects';
-import { ChunkManager, ChunkCoord } from './items/ChunkManager';
+
+type WithoutPosition<T> = T extends any ? Omit<T, 'position'> : never;
+type ObjectDefaults = WithoutPosition<AnyObjectData>;
+
+
+
+import { ChunkManager, ChunkCoord, PositioningType } from './items/ChunkManager';
 
 
 
@@ -11,69 +17,76 @@ export function createApp() {
     let placedObjects = 0;
   // Example: use ChunkManager to generate objects for a region
   const globalSeed = 'demo-seed';
-  const chunkSize = 10;
+  const chunkSize = 20;
   const chunkManager = new ChunkManager(globalSeed, chunkSize);
 
   // Choose a region of chunks to load, centered at (centerChunkX, centerChunkY)
-  const regionRadius = 2; // 1 = 3x3 region
+  const regionRadius = 1; // 1 = 3x3 region
   const centerChunkX = 0; // Set this to your desired center chunk X
   const centerChunkY = 0; // Set this to your desired center chunk Y
   const objects: AnyObjectData[] = [];
+
   // Define object types and their spawn frequencies (probabilities)
   // Frequency is the probability (e.g., 0.1 = 10%)
-  const objectTypes = [
+
+  const objectTypes: Array<{
+    frequency: number;
+    defaults: ObjectDefaults;
+    positioningType: PositioningType;
+  }> = [
     {
-      type: 'ball',
-      color: 0x00aaff,
-      frequency: 0.02, 
+      frequency: 0.005,
+      positioningType: 'random',
+      defaults: {
+        type: 'ball',
+        color: 0x00aaff,
+      },
     },
     {
-      type: 'bumper',
-      color: 0xffaa00,
-      frequency: 0.02, 
-      bumpStrength: 10,
+      frequency: 0.005,
+      positioningType: 'noise',
+      defaults: {
+        type: 'bumper',
+        bumpStrength: 10,
+      },
     },
     {
-      type: 'attractor',
-      color: 0xaa00ff,
-      frequency: 0.02, 
-      attraction: 0.1,
+      frequency: 0.00125,
+      positioningType: 'noise',
+      defaults: {
+        type: 'attractor',
+        attraction: 0.1,
+      },
     },
   ];
 
-  // Calculate explicit start and end for each object type (for clarity)
-  let cumulative = 0;
-  const objectRanges = objectTypes.map(obj => {
-    const start = cumulative;
-    const end = cumulative + obj.frequency;
-    cumulative = end;
-    return { ...obj, start, end };
-  });
-  // Log the ranges for clarity
-  console.log('Object spawn ranges:', objectRanges.map(o => ({ type: o.type, start: o.start, end: o.end })));
+
+
+
 
   for (let cx = centerChunkX - regionRadius; cx <= centerChunkX + regionRadius; cx++) {
     for (let cy = centerChunkY - regionRadius; cy <= centerChunkY + regionRadius; cy++) {
       const chunkCoord: ChunkCoord = { x: cx, y: cy };
-      const chunkData = chunkManager.getChunk(chunkCoord);
       for (let i = 0; i < chunkSize; i++) {
         for (let j = 0; j < chunkSize; j++) {
           totalCells++;
-          const value = chunkData[i][j]; // value in [0,1)
           const pos = { x: cx * chunkSize + i, y: 0, z: cy * chunkSize + j };
-          for (const objDef of objectRanges) {
-            if (value >= objDef.start && value < objDef.end) {
-              const obj: any = {
-                type: objDef.type,
+          for (const objDef of objectTypes) {
+            // Use ChunkManager's getChunk with per-type positioningType
+            const chunk = chunkManager.getChunk(
+              chunkCoord,
+              {
+                type: objDef.positioningType,
+                seed: globalSeed + '-' + objDef.defaults.type,
+                frequency: objDef.frequency,
+              }
+            );
+            // Check if this cell should have this object type
+            if (chunk[i][j]) {
+              const obj: AnyObjectData = {
+                ...objDef.defaults,
                 position: pos,
-                color: objDef.color,
               };
-              if (objDef.type === 'bumper' && objDef.bumpStrength !== undefined) {
-                obj.bumpStrength = objDef.bumpStrength;
-              }
-              if (objDef.type === 'attractor' && objDef.attraction !== undefined) {
-                obj.attraction = objDef.attraction;
-              }
               objects.push(obj);
               placedObjects++;
               break; // Only place one object per cell
