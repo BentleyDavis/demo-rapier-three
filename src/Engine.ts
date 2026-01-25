@@ -26,6 +26,7 @@ export interface EngineConfig {
     };
   };
   objects: AnyObjectData[];
+// ...existing code...
 }
 
 
@@ -35,6 +36,34 @@ export interface EngineConfig {
 /** Contains the three.js renderer and handles to important resources. */
 
 export class Engine {
+    // Set up mouse wheel zoom for orthogonal camera
+    private setupZoomControls() {
+      const canvas = this.renderer.domElement;
+      canvas.addEventListener('wheel', (e) => {
+        if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
+          e.preventDefault();
+          // Zoom in/out
+          const zoomDelta = e.deltaY > 0 ? 1.1 : 0.9;
+          this.zoom *= zoomDelta;
+          this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
+          this.updateCameraZoom();
+        }
+      }, { passive: false });
+    }
+
+    // Update orthographic camera zoom
+    private updateCameraZoom() {
+      if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
+        const cam = this.camera as OrthographicCamera;
+        const aspect = this.renderer.domElement.clientWidth / this.renderer.domElement.clientHeight;
+        const d = 20 * (1 / this.zoom);
+        cam.left = -d * aspect;
+        cam.right = d * aspect;
+        cam.top = d;
+        cam.bottom = -d;
+        cam.updateProjectionMatrix();
+      }
+    }
   public readonly scene = new Scene();
   public readonly camera: Camera;
   public readonly renderer: WebGLRenderer;
@@ -45,6 +74,10 @@ export class Engine {
   private panTarget = new Vector3(0, 0, 0);
   private isPanning = false;
   private lastPan = { x: 0, y: 0 };
+  // Zoom state
+  private zoom = 1.0;
+  private readonly minZoom = 0.3;
+  private readonly maxZoom = 3.0;
 
   private mount: HTMLElement | undefined;
   private frameId: number | null = null;
@@ -96,8 +129,10 @@ export class Engine {
     this.createAmbientLight();
     this.createSunLight();
     this.renderer = this.createRenderer();
-    // Set up event listeners for orthogonal camera panning
+    // Set up event listeners for orthogonal camera panning and zoom
     this.setupPanControls();
+    this.setupZoomControls();
+    // ...existing code...
   }
 
   /** Adds a sun (directional light) to the scene. */
@@ -247,7 +282,7 @@ export class Engine {
       if (this.isPanning && 'isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
         const dx = e.clientX - this.lastPan.x;
         const dy = e.clientY - this.lastPan.y;
-        // Calculate world units per pixel
+        // Calculate world units per pixel (adjusted for zoom)
         const cam = this.camera as OrthographicCamera;
         const width = this.renderer.domElement.clientWidth;
         const height = this.renderer.domElement.clientHeight;
@@ -308,7 +343,7 @@ export class Engine {
         default:
           return;
       }
-      // Use the same isometric mapping as mouse
+      // Use the same isometric mapping as mouse (adjusted for zoom)
       const worldDx = dx * worldPerPixelX;
       const worldDy = dy * worldPerPixelY;
       const isoX = { x: -Math.cos(isoAzimuth), z: Math.sin(isoAzimuth) };
@@ -324,18 +359,18 @@ export class Engine {
   // Update camera position to follow panTarget, always looking down at same angle
   private updateCameraPan() {
     if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
-          // True isometric: fixed azimuth and elevation
-          const cam = this.camera;
-          const isoAzimuth = Math.PI / 4; // 45 degrees
-          const isoElevation = Math.atan(1 / Math.sqrt(2)); // ~35.26 degrees
-          const dist = 40;
-          // Calculate camera position in isometric direction
-          const camX = this.panTarget.x + dist * Math.cos(isoElevation) * Math.cos(isoAzimuth);
-          const camY = this.panTarget.y + dist * Math.sin(isoElevation);
-          const camZ = this.panTarget.z + dist * Math.cos(isoElevation) * Math.sin(isoAzimuth);
-          cam.position.set(camX, camY, camZ);
-          cam.lookAt(this.panTarget.x, this.panTarget.y, this.panTarget.z);
-          cam.updateMatrixWorld();
+      // True isometric: fixed azimuth and elevation
+      const cam = this.camera;
+      const isoAzimuth = Math.PI / 4; // 45 degrees
+      const isoElevation = Math.atan(1 / Math.sqrt(2)); // ~35.26 degrees
+      const dist = 40 * (1 / this.zoom);
+      // Calculate camera position in isometric direction
+      const camX = this.panTarget.x + dist * Math.cos(isoElevation) * Math.cos(isoAzimuth);
+      const camY = this.panTarget.y + dist * Math.sin(isoElevation);
+      const camZ = this.panTarget.z + dist * Math.cos(isoElevation) * Math.sin(isoAzimuth);
+      cam.position.set(camX, camY, camZ);
+      cam.lookAt(this.panTarget.x, this.panTarget.y, this.panTarget.z);
+      cam.updateMatrixWorld();
     }
   }
 
@@ -356,7 +391,7 @@ export class Engine {
       } else if ('isOrthographicCamera' in this.camera && this.camera.isOrthographicCamera) {
         const cam = this.camera as OrthographicCamera;
         const aspect = width / height;
-        const d = 20;
+        const d = 20 * (1 / this.zoom);
         cam.left = -d * aspect;
         cam.right = d * aspect;
         cam.top = d;
