@@ -1,4 +1,4 @@
-import type { RigidBody, Collider } from '@dimforge/rapier3d';
+import type { RigidBody, Collider, World } from '@dimforge/rapier3d';
 import type { Mesh } from 'three';
 
 /**
@@ -38,4 +38,6 @@ export interface BaseObject {
   mesh: Mesh;
   body: RigidBody;
   collider: Collider;
+  handleCollision?: (other: BaseObject | undefined, world?: World) => void;
+  step?: (obj: BaseObject, dt: number, allObjects?: BaseObject[], world?: World) => void;
 }

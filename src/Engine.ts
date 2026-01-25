@@ -177,7 +177,7 @@ export class Engine {
     // Increment simulation step counter
     this.simulationStep++;
 
-    // Call step function for each object if available, always pass physicsWorld
+    // Step all objects
     for (const obj of this.objects) {
       const type = obj.data.type;
       const step = type && (stepFuncs[type] as Function | undefined);
@@ -189,32 +189,20 @@ export class Engine {
     // Run physics and handle contact events
     if (this.physicsWorld && this.eventQueue) {
       this.physicsWorld.step(this.eventQueue);
-      // Handle contact events for bumpers
+      // Delegate collision handling to objects
       this.eventQueue.drainCollisionEvents((handle1: number, handle2: number, started: boolean) => {
         if (!started) return;
-        // Log all collision events for debugging
         const obj1 = this.objects.find(obj => obj.collider.handle === handle1);
         const obj2 = this.objects.find(obj => obj.collider.handle === handle2);
-        console.log('Collision event:', { handle1, handle2, obj1Type: obj1?.data.type, obj2Type: obj2?.data.type });
-        // Find bumper and ball objects by collider handle
-        const bumper = this.objects.find(obj => obj.data.type === 'bumper' && (obj.collider.handle === handle1 || obj.collider.handle === handle2));
-        const ball = this.objects.find(obj => obj.data.type === 'ball' && (obj.collider.handle === handle1 || obj.collider.handle === handle2));
-        if (bumper && ball && bumper.data.type === 'bumper') {
-          // Apply impulse from bumper to ball
-          const t1 = ball.body.translation();
-          const t2 = bumper.body.translation();
-          const dx = t1.x - t2.x;
-          const dz = t1.z - t2.z;
-          const dist = Math.sqrt(dx * dx + dz * dz) || 0.01;
-          const forceMag = (bumper.data as any).bumpStrength * 3;
-          const fx = (dx / dist) * forceMag;
-          const fz = (dz / dist) * forceMag;
-          ball.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
+        if (obj1 && typeof obj1.handleCollision === 'function') {
+          obj1.handleCollision(obj2, this.physicsWorld);
+        }
+        if (obj2 && typeof obj2.handleCollision === 'function') {
+          obj2.handleCollision(obj1, this.physicsWorld);
         }
       });
     }
-
-    // Update mesh positions and reset y to zero
+    // Update mesh positions for all objects after physics step
     for (const obj of this.objects) {
       if (!obj.body || !obj.mesh) continue;
       const t = obj.body.translation();

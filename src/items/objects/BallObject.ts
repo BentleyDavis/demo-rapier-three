@@ -23,13 +23,15 @@ function create(data: BallObjectData, scene: Scene, world: World, rapier: Rapier
   const clDesc = rapier.ColliderDesc.ball(1);
   clDesc.setActiveEvents(1); // COLLISION_EVENTS = 1
   const collider = world.createCollider(clDesc, body);
-  const obj = { data, mesh, body, collider };
+  const obj: BallObject = {
+    data,
+    mesh,
+    body,
+    collider
+  };
   configureBaseObjectPhysics(obj);
   return obj;
 }
 
-function step(obj: BallObject, dt: number, allObjects?: BaseObject[], world?: World) {
-  // Ball-specific step logic (if any)
-}
 
-export const BallBuilder = { type: 'ball', create, step };
+export const BallBuilder = { type: 'ball', create };

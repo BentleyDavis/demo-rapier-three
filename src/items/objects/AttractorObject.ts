@@ -10,6 +10,7 @@ export interface AttractorObjectData extends BaseObjectData {
 
 export interface AttractorObject extends BaseObject {
   data: AttractorObjectData;
+  handleCollision?: (other: BaseObject | undefined, world?: World) => void;
 }
 
 function create(data: AttractorObjectData, scene: Scene, world: World, rapier: Rapier): AttractorObject {
@@ -23,7 +24,15 @@ function create(data: AttractorObjectData, scene: Scene, world: World, rapier: R
   const clDesc = rapier.ColliderDesc.cylinder(1, 1);
   clDesc.setActiveEvents(1); // COLLISION_EVENTS = 1
   const collider = world.createCollider(clDesc, body);
-  const obj = { data, mesh, body, collider };
+  const obj: AttractorObject = {
+    data,
+    mesh,
+    body,
+    collider,
+    handleCollision: (other, world) => {
+      // Attractor-specific collision logic (if any)
+    }
+  };
   configureBaseObjectPhysics(obj);
   return obj;
 }
@@ -49,6 +58,7 @@ function step(obj: AttractorObject, dt: number, allObjects?: BaseObject[], world
       }
     }
   }
+
 }
 
 

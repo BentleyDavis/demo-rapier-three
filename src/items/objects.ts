@@ -17,9 +17,11 @@ type BuilderType = typeof objectBuilders[number];
 export type AnyObject = ReturnType<BuilderType['create']>;
 export type AnyObjectData = Parameters<BuilderType['create']>[0];
 
-// Step and create function maps built dynamically from objectBuilders
+// Only include step if it exists on the builder
 export const stepFuncs = Object.fromEntries(
-  objectBuilders.map(builder => [builder.type, builder.step])
+  objectBuilders
+    .filter(builder => typeof (builder as any).step === 'function')
+    .map(builder => [builder.type, (builder as any).step])
 );
 export const createFuncs = Object.fromEntries(
   objectBuilders.map(builder => [builder.type, builder.create])

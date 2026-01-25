@@ -10,6 +10,7 @@ export interface BumperObjectData extends BaseObjectData {
 
 export interface BumperObject extends BaseObject {
   data: BumperObjectData;
+  handleCollision?: (other: BaseObject | undefined, world?: World) => void;
 }
 
 function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapier): BumperObject {
@@ -23,7 +24,26 @@ function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapi
   const clDesc = rapier.ColliderDesc.cylinder(1, 1);
   clDesc.setActiveEvents(1); // COLLISION_EVENTS = 1
   const collider: import('@dimforge/rapier3d').Collider = world.createCollider(clDesc, body);
-  const obj = { data, mesh, body, collider };
+  const obj: BumperObject = {
+    data,
+    mesh,
+    body,
+    collider,
+    handleCollision: (other, world) => {
+      if (!other || !world) return;
+      // Only bump balls
+      if (other.data.type !== 'ball') return;
+      const t1 = other.body.translation();
+      const t2 = obj.body.translation();
+      const dx = t1.x - t2.x;
+      const dz = t1.z - t2.z;
+      const dist = Math.sqrt(dx * dx + dz * dz) || 0.01;
+      const forceMag = obj.data.bumpStrength * 3;
+      const fx = (dx / dist) * forceMag;
+      const fz = (dz / dist) * forceMag;
+      other.body.applyImpulse({ x: fx, y: 0, z: fz }, true);
+    }
+  };
   configureBaseObjectPhysics(obj);
   return obj;
 }
