@@ -7,6 +7,7 @@ export interface BallObjectData extends BaseObjectData {
   type: 'ball';
   fixed?: boolean;
   color?: number;
+  velocity?: { x: number; y: number; z: number };
 }
 
 export interface BallObject extends BaseObject {
@@ -31,6 +32,10 @@ function create(data: BallObjectData, scene: Scene, world: World, rapier: Rapier
     collider
   };
   configureBaseObjectPhysics(obj);
+  // Set initial velocity if provided
+  if (data.velocity && typeof body.setLinvel === 'function') {
+    body.setLinvel(data.velocity, true);
+  }
   return obj;
 }
 

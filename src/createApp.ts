@@ -47,17 +47,17 @@ export function createApp() {
       positioningType: 'noise',
       defaults: {
         type: 'bumper',
-        bumpStrength: 10,
+        bumpStrength: 20,
       },
     },
-    {
-      frequency: 0.00125,
-      positioningType: 'noise',
-      defaults: {
-        type: 'attractor',
-        attraction: 0.1,
-      },
-    },
+    // {
+    //   frequency: 0.00125,
+    //   positioningType: 'noise',
+    //   defaults: {
+    //     type: 'attractor',
+    //     attraction: 0.1,
+    //   },
+    // },
   ];
 
 
@@ -98,6 +98,16 @@ export function createApp() {
   }
 
 
+  // Add a cue ball after object placement
+  // Place cue at a fixed position (e.g., -10, 0, 0) and give it an initial velocity toward the center
+  const cueBall: AnyObjectData & { velocity?: { x: number; y: number; z: number } } = {
+    type: 'ball',
+    color: 0xffffff,
+    position: { x: -10, y: 0, z: 0 },
+    velocity: { x: 100, y: 0, z: 0 } // Move toward positive X (toward center)
+  };
+  objects.push(cueBall);
+
   const config: EngineConfig = {
     world: {
       camera: {
@@ -110,6 +120,9 @@ export function createApp() {
   const engine = new Engine(config);
   const renderElt = document.getElementById('root')!;
   engine.attach(renderElt);
+
+
+
   // No orbit controls for strict top-down 2D feel
   return engine;
 }
