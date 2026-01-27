@@ -40,17 +40,20 @@ describe("Chunk Generator", () => {
   }
 
   // Print chunk visually using Unicode
-  function printChunk(idArray: string[][], size: number): void {
+  function printChunk(idArray: string[][]): void {
     let output = '';
-    for (let y = 0; y < size; y++) {
+    const height = idArray.length;
+    const width = height > 0 ? idArray[0].length : 0;
+    for (let y = 0; y < height; y++) {
       let row = '';
-      for (let x = 0; x < size; x++) {
+      for (let x = 0; x < width; x++) {
         const id = idArray[y][x];
         row += tileIdToUnicode(id);
       }
       output += row + '\r\n';
     }
     console.log(output);
+
   }
 
   it("should generate consistent blank chunks for the same seed and coordinates", () => {
@@ -58,7 +61,8 @@ describe("Chunk Generator", () => {
     const chunkConfig = {
       worldConfig: {
         seed: 123,
-        dimensionSize: 4,
+        height: 100,
+        width: 120,
         tileTypes: [
           {
             type: "land",
@@ -95,8 +99,8 @@ describe("Chunk Generator", () => {
     };
 
     const idArray: string[][] = generateChunk(chunkConfig);
-    console.log("Generated idArray:", idArray);
+    // console.log("Generated idArray:", idArray);
     // Print chunk visually
-    printChunk(idArray, chunkConfig.worldConfig.dimensionSize);
+    printChunk(idArray);
   });
 });

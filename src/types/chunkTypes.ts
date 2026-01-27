@@ -14,9 +14,13 @@ export interface CellNode {
 export interface WorldConfig {
     seed: number;
     /**
-     * The length of each side of a square chunk.
+     * The number of rows (height) in the chunk.
      */
-    dimensionSize: number;
+    height: number;
+    /**
+     * The number of columns (width) in the chunk.
+     */
+    width: number;
     perimeterSize?: number;
     tileTypes: TileType[]; // Only base tile types, no id/rotation
 }

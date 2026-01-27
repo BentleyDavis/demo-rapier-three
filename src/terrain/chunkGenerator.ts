@@ -1,9 +1,9 @@
-import * as seedrandom from 'seedrandom';
+import * as seedRandom from 'seedrandom';
 import type { Tile, ChunkConfig, CellNode } from "../types/chunkTypes";
 import { expandTileTypes } from './expandTileTypes';
 
 // Helper: collapse a cell by picking a random available tile
-function collapseCell(cell: CellNode, prng: seedrandom.PRNG) {
+function collapseCell(cell: CellNode, prng: seedRandom.PRNG) {
     if (cell.availableTiles.length === 0) return;
     // Filter availableTiles to only those compatible with all currently-collapsed neighbors
     const compatibleTiles = cell.availableTiles.filter(tile => {
@@ -35,15 +35,16 @@ import { directions } from './directions';
 
 export function generateChunk(chunkConfig: ChunkConfig) {
     const seed = chunkConfig.worldConfig.seed + ':' + chunkConfig.x + ':' + chunkConfig.y;
-    const prng = seedrandom(seed);
+    const prng = seedRandom(seed);
 
     // Expand tile types to all rotated tiles
     const allTiles = expandTileTypes(chunkConfig.worldConfig.tileTypes);
-    const size = chunkConfig.worldConfig.dimensionSize;
+    const height = chunkConfig.worldConfig.height;
+    const width = chunkConfig.worldConfig.width;
     const chunkArray: CellNode[][] = [];
-    for (let y = 0; y < size; y++) {
+    for (let y = 0; y < height; y++) {
         const row: CellNode[] = [];
-        for (let x = 0; x < size; x++) {
+        for (let x = 0; x < width; x++) {
             row.push({
                 x,
                 y,
@@ -55,12 +56,12 @@ export function generateChunk(chunkConfig: ChunkConfig) {
     }
 
     // Set neighbor references
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
             const cell = chunkArray[y][x];
             if (y > 0) cell.N = chunkArray[y - 1][x];
-            if (y < size - 1) cell.S = chunkArray[y + 1][x];
-            if (x < size - 1) cell.E = chunkArray[y][x + 1];
+            if (y < height - 1) cell.S = chunkArray[y + 1][x];
+            if (x < width - 1) cell.E = chunkArray[y][x + 1];
             if (x > 0) cell.W = chunkArray[y][x - 1];
         }
     }
@@ -85,8 +86,8 @@ export function generateChunk(chunkConfig: ChunkConfig) {
     // Group cells by the number of available tiles
     const groupedByOptions: Record<number, Set<CellNode>> = {};
     let minOptions = Infinity;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
             const cell = chunkArray[y][x];
             if (cell.tile === null && cell.availableTiles.length > 0) {
                 const optionsCount = cell.availableTiles.length;
@@ -103,7 +104,7 @@ export function generateChunk(chunkConfig: ChunkConfig) {
     while (minOptions !== Infinity) {
         const minSet = groupedByOptions[minOptions];
         if (!minSet || minSet.size === 0) {
-            const nextMin = findNextMinOptions(groupedByOptions, minOptions, size * size);
+            const nextMin = findNextMinOptions(groupedByOptions, minOptions, height * width);
             if (nextMin === undefined) break; // No more uncollapsed cells
             minOptions = nextMin;
             continue;
@@ -146,7 +147,7 @@ export function generateChunk(chunkConfig: ChunkConfig) {
         }
         // Update minOptions if needed
         if (!groupedByOptions[minOptions] || groupedByOptions[minOptions].size === 0) {
-            const nextMin = findNextMinOptions(groupedByOptions, minOptions, size * size);
+            const nextMin = findNextMinOptions(groupedByOptions, minOptions, height * width);
             if (nextMin === undefined) break;
             minOptions = nextMin;
         }
