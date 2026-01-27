@@ -3,8 +3,7 @@ import type { ChunkConfig } from "../types/chunkTypes";
 describe("Chunk Generator", () => {
   // Utility to map tile id (type_rotation) to Unicode box drawing
   function tileIdToUnicode(id: string): string {
-    // Map for corners (type: 'corner')
-    // 0: NE ┐ U+2557, 90: NW ┌ U+2554, 180: SW └ U+255A, 270: SE ┘ U+255D
+
     if (id.startsWith('corner_')) {
       const rot = parseInt(id.split('_')[1], 10);
       switch (rot) {
@@ -15,15 +14,14 @@ describe("Chunk Generator", () => {
         default: return '?';
       }
     }
-    // Corridor: vertical (0,180) │ U+2551, horizontal (90,270) ─ U+2550
+
     if (id.startsWith('corridor_')) {
       const rot = parseInt(id.split('_')[1], 10);
       if (rot === 0 || rot === 180) return '║';
       if (rot === 90 || rot === 270) return '═';
       return '?';
     }
-    // OneWall: T shapes
-    // 0: T up ┬ U+2566, 90: T left ├ U+251C, 180: T down ┴ U+2569, 270: T right ┤ U+2524
+
     if (id.startsWith('oneWall_')) {
       const rot = parseInt(id.split('_')[1], 10);
       switch (rot) {
@@ -34,9 +32,9 @@ describe("Chunk Generator", () => {
         default: return '?';
       }
     }
-    // Land: open, use space or light shade ░ U+2591
+
     if (id.startsWith('land_')) {
-      return ' ';
+      return '╬';
     }
     return '?';
   }
