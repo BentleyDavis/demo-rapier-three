@@ -1,6 +1,6 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
-import { Mesh, MeshStandardMaterial, SphereGeometry, Scene } from 'three';
+import { Mesh, MeshStandardMaterial, SphereGeometry, Scene, Group } from 'three';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
 
 export interface BallObjectData extends BaseObjectData {
@@ -15,21 +15,23 @@ export interface BallObject extends BaseObject {
 }
 
 function create(data: BallObjectData, scene: Scene, world: World, rapier: Rapier): BallObject {
-  const geometry = new SphereGeometry(1, 32, 32);
+  const geometry = new SphereGeometry(.5, 32, 32);
   const material = new MeshStandardMaterial({ color: data.color ?? 0xffff00 });
   const mesh = new Mesh(geometry, material);
-  scene.add(mesh);
+  const group = new Group();
+  group.add(mesh);
+  scene.add(group);
   let rbDesc = data.fixed ? rapier.RigidBodyDesc.fixed() : rapier.RigidBodyDesc.dynamic();
   rbDesc.setTranslation(data.position.x, data.position.y, data.position.z);
   const body = world.createRigidBody(rbDesc);
-  const clDesc = rapier.ColliderDesc.ball(1);
+  const clDesc = rapier.ColliderDesc.ball(0.5);
   clDesc.setActiveEvents(1); // COLLISION_EVENTS = 1
   const collider = world.createCollider(clDesc, body);
   const obj: BallObject = {
     data,
-    mesh,
+    mesh: group,
     body,
-    collider
+    collider: [collider]
   };
   configureBaseObjectPhysics(obj);
   // Set initial velocity if provided

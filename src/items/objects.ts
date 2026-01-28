@@ -1,12 +1,20 @@
 import { BallBuilder } from './objects/BallObject';
 import { AttractorBuilder } from './objects/AttractorObject';
 import { BumperBuilder } from './objects/BumperObject';
+import { LandBuilder } from './objects/LandObject';
+import { CorridorBuilder } from './objects/CorridorObject';
+import { OneWallBuilder } from './objects/OneWallObject';
+import { CornerBuilder } from './objects/CornerObject';
 
 // Add new object builders here as you create them:
 export const objectBuilders = [
   BallBuilder,
   AttractorBuilder,
   BumperBuilder,
+  LandBuilder,
+  CorridorBuilder,
+  OneWallBuilder,
+  CornerBuilder,
 ];
 
 // Add new object types here as you create them:

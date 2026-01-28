@@ -175,8 +175,8 @@ export class Engine {
     // Physics objects cannot be created until after physics engine is initialized.
     const r = (this.rapier = await getRapier());
 
-    // Create physics world with default zero gravity
-    this.physicsWorld = new r.World(new Vector3(0, 0, 0));
+    // Create physics world with gravity (downward Y)
+    this.physicsWorld = new r.World(new Vector3(0, -9.81, 0));
     this.eventQueue = new r.EventQueue(true);
 
     // Create all objects from configs using the new object builder pattern
@@ -235,8 +235,10 @@ export class Engine {
       // Delegate collision handling to objects
       this.eventQueue.drainCollisionEvents((handle1: number, handle2: number, started: boolean) => {
         if (!started) return;
-        const obj1 = this.objects.find(obj => obj.collider.handle === handle1);
-        const obj2 = this.objects.find(obj => obj.collider.handle === handle2);
+        const findObjByHandle = (handle: number) =>
+          this.objects.find(obj => obj.collider.some(c => c.handle === handle));
+        const obj1 = findObjByHandle(handle1);
+        const obj2 = findObjByHandle(handle2);
         if (obj1 && typeof obj1.handleCollision === 'function') {
           obj1.handleCollision(obj2, this.physicsWorld);
         }
@@ -249,7 +251,11 @@ export class Engine {
     for (const obj of this.objects) {
       if (!obj.body || !obj.mesh) continue;
       const t = obj.body.translation();
-      obj.mesh.position.set(t.x, 0, t.z);
+      if (obj.mesh && obj.mesh.position && typeof obj.mesh.position.set === 'function') {
+        obj.mesh.position.set(t.x, t.y, t.z);
+      } else {
+        console.error('Object mesh is not a THREE.Group or does not have a position property:', obj);
+      }
     }
   }
 

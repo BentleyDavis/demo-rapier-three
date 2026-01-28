@@ -1,6 +1,6 @@
 import type { RigidBody, World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
-import { Mesh, MeshStandardMaterial, CylinderGeometry, Scene } from 'three';
+import { Mesh, MeshStandardMaterial, CylinderGeometry, Scene, Group } from 'three';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
 
 export interface BumperObjectData extends BaseObjectData {
@@ -17,7 +17,9 @@ function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapi
   const geometry = new CylinderGeometry(1, 1, 1.9, 32);
   const material = new MeshStandardMaterial({ color: 0xffaa00 });
   const mesh = new Mesh(geometry, material);
-  scene.add(mesh);
+  const group = new Group();
+  group.add(mesh);
+  scene.add(group);
   const rbDesc = rapier.RigidBodyDesc.fixed();
   rbDesc.setTranslation(data.position.x, data.position.y, data.position.z);
   const body = world.createRigidBody(rbDesc);
@@ -26,9 +28,9 @@ function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapi
   const collider: import('@dimforge/rapier3d').Collider = world.createCollider(clDesc, body);
   const obj: BumperObject = {
     data,
-    mesh,
+    mesh: group,
     body,
-    collider,
+    collider: [collider],
     handleCollision: (other, world) => {
       if (!other || !world) return;
       // Only bump balls
@@ -53,7 +55,7 @@ function step(obj: BumperObject, dt: number, allObjects: BaseObject[], world: Wo
   for (const target of allObjects) {
     if (target.body.isFixed() || !('collider' in target)) continue;
     // Check for contact between bumper and target collider
-    if (world.intersectionPair(obj.collider, target.collider)) {
+    if (world.intersectionPair(obj.collider[0], target.collider[0])) {
       // Calculate direction from bumper to target
       const t1 = target.body.translation();
       const t2 = obj.body.translation();

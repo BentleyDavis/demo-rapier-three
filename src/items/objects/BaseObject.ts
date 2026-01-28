@@ -17,11 +17,17 @@ export function configureBaseObjectPhysics(
     // Add more properties here as needed
   }
 ): void {
-  const linearDamping = options?.linearDamping ?? 0.5;
-  const angularDamping = options?.angularDamping ?? 0.5;
+  const linearDamping = options?.linearDamping ?? 0.1;
+  const angularDamping = options?.angularDamping ?? 0.1;
   obj.body.setLinearDamping(linearDamping);
   obj.body.setAngularDamping(angularDamping);
-  obj.mesh.castShadow = true;
+  if (obj.mesh && 'children' in obj.mesh) {
+    for (const m of obj.mesh.children) {
+      if ('castShadow' in m) {
+        m.castShadow = true;
+      }
+    }
+  }
   // Extend with more property setters as needed
 }
 
@@ -32,11 +38,12 @@ export interface BaseObjectData {
   position: { x: number; y: number; z: number };
 }
 
+import type { Group } from 'three';
 export interface BaseObject {
   data: BaseObjectData;
-  mesh: Mesh;
+  mesh: Group;
   body: RigidBody;
-  collider: Collider;
+  collider: Collider[];
   handleCollision?: (other: BaseObject | undefined, world?: World) => void;
   step?: (obj: BaseObject, dt: number, allObjects?: BaseObject[], world?: World) => void;
 }

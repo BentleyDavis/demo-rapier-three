@@ -1,9 +1,9 @@
-import * as seedRandom from 'seedrandom';
+import seedrandom from 'seedrandom';
 import type { Tile, ChunkConfig, CellNode } from "../types/chunkTypes";
 import { expandTileTypes } from './expandTileTypes';
 
 // Helper: collapse a cell by picking a random available tile
-function collapseCell(cell: CellNode, prng: seedRandom.PRNG) {
+function collapseCell(cell: CellNode, prng: seedrandom.PRNG) {
     if (cell.availableTiles.length === 0) return;
     // Filter availableTiles to only those compatible with all currently-collapsed neighbors
     const compatibleTiles = cell.availableTiles.filter(tile => {
@@ -35,7 +35,7 @@ import { directions } from './directions';
 
 export function generateChunk(chunkConfig: ChunkConfig) {
     const seed = chunkConfig.worldConfig.seed + ':' + chunkConfig.x + ':' + chunkConfig.y;
-    const prng = seedRandom(seed);
+    const prng = seedrandom(seed);
 
     // Expand tile types to all rotated tiles
     const allTiles = expandTileTypes(chunkConfig.worldConfig.tileTypes);

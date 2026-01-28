@@ -1,6 +1,6 @@
 import type { RigidBody, World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
-import { Mesh, MeshStandardMaterial, CylinderGeometry, Scene } from 'three';
+import { Mesh, MeshStandardMaterial, CylinderGeometry, Scene, Group } from 'three';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
 
 export interface AttractorObjectData extends BaseObjectData {
@@ -17,7 +17,9 @@ function create(data: AttractorObjectData, scene: Scene, world: World, rapier: R
   const geometry = new CylinderGeometry(1, 1, 2, 32);
   const material = new MeshStandardMaterial({ color: 0xff00ff });
   const mesh = new Mesh(geometry, material);
-  scene.add(mesh);
+  const group = new Group();
+  group.add(mesh);
+  scene.add(group);
   const rbDesc = rapier.RigidBodyDesc.fixed();
   rbDesc.setTranslation(data.position.x, data.position.y, data.position.z);
   const body = world.createRigidBody(rbDesc);
@@ -26,9 +28,9 @@ function create(data: AttractorObjectData, scene: Scene, world: World, rapier: R
   const collider = world.createCollider(clDesc, body);
   const obj: AttractorObject = {
     data,
-    mesh,
+    mesh: group,
     body,
-    collider,
+    collider: [collider],
     handleCollision: (other, world) => {
       // Attractor-specific collision logic (if any)
     }
