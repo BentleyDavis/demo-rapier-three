@@ -1,7 +1,7 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
 import { Mesh, Scene, Group, Vector3 } from 'three';
-import { createWallMesh, WALL_LENGTH, WALL_HEIGHT, WALL_THICKNESS } from './wallUtils.js';
+import { createWallMesh, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
 import { ColliderGroup } from './ColliderGroup';
 import { createTileFloor } from '../tileFloor';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
@@ -24,12 +24,17 @@ function create(data: CorridorObjectData, scene: Scene, world: World, rapier: Ra
 
   // Represent a corridor as two parallel walls (N/S open, E/W closed)
   const group = new Group();
-  // Wall on the west (x = -0.85)
+
+  // Calculate wall positions based on wallLength and wallThickness
+  const wallOffset = (tileWidth - wallThickness) / 2;
+
+  // Wall on the west (x = -wallOffset)
   const wallW = createWallMesh('vertical');
-  wallW.position.set(-0.85, 0, 0);
-  // Wall on the east (x = +0.85)
+  wallW.position.x = -wallOffset;
+
+  // Wall on the east (x = +wallOffset)
   const wallE = createWallMesh('vertical');
-  wallE.position.set(0.85, 0, 0);
+  wallE.position.x = wallOffset;
   group.add(wallW);
   group.add(wallE);
   if (data.rotation) group.rotation.y = -(data.rotation * Math.PI) / 180;
@@ -42,17 +47,17 @@ function create(data: CorridorObjectData, scene: Scene, world: World, rapier: Ra
 
   // Two colliders for the corridor walls, attached to the same body, using ColliderGroup
   const colliderGroup = new ColliderGroup();
-  const clDescW = rapier.ColliderDesc.cuboid(WALL_THICKNESS / 2, WALL_HEIGHT / 2, WALL_LENGTH / 2);
+  const clDescW = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, tileWidth / 2);
   clDescW.setActiveEvents(1);
   colliderGroup.addCollider(
     clDescW,
-    new Vector3(-0.85, 0, 0)
+    new Vector3(-wallOffset, 0, 0)
   );
-  const clDescE = rapier.ColliderDesc.cuboid(WALL_THICKNESS / 2, WALL_HEIGHT / 2, WALL_LENGTH / 2);
+  const clDescE = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, tileWidth / 2);
   clDescE.setActiveEvents(1);
   colliderGroup.addCollider(
     clDescE,
-    new Vector3(0.85, 0, 0)
+    new Vector3(wallOffset, 0, 0)
   );
   let groupRotation = 0;
   if (data.rotation) {

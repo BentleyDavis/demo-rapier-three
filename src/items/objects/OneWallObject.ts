@@ -1,7 +1,7 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
 import { Mesh, Scene, Group, Vector3 } from 'three';
-import { createWallMesh, WALL_LENGTH, WALL_HEIGHT, WALL_THICKNESS } from './wallUtils.js';
+import { createWallMesh, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
 import { ColliderGroup } from './ColliderGroup';
 import { createTileFloor } from '../tileFloor';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
@@ -16,10 +16,13 @@ export interface OneWallObject extends BaseObject {
 }
 
 
+
 function create(data: OneWallObjectData, scene: Scene, world: World, rapier: Rapier): OneWallObject {
-  // Wall geometry: always at the north edge (z = -0.85), matching N/S closed, E/W open pattern
+  // Calculate wall position for the north edge based on wallLength and wallThickness
+  const wallOffset = -(tileWidth - wallThickness) / 2;
+  // Wall geometry: always at the north edge (z = wallOffset), matching N/S closed, E/W open pattern
   const wallMesh = createWallMesh('horizontal');
-  wallMesh.position.set(0, 0, -0.85); // always north edge
+  wallMesh.position.z = wallOffset;
 
   // Group all meshes
   const group = new Group();
@@ -43,12 +46,12 @@ function create(data: OneWallObjectData, scene: Scene, world: World, rapier: Rap
 
   // Wall collider (north edge) using ColliderGroup
   const colliderGroup = new ColliderGroup();
-  const wallColliderDesc = rapier.ColliderDesc.cuboid(WALL_LENGTH / 2, WALL_HEIGHT / 2, WALL_THICKNESS / 2);
+  const wallColliderDesc = rapier.ColliderDesc.cuboid(tileWidth / 2, wallHeight / 2, wallThickness / 2);
   wallColliderDesc.setActiveEvents(1);
   colliderGroup.addCollider(
     wallColliderDesc,
     // local position matches mesh
-    new Vector3(0, 0, -0.85)
+    new Vector3(0, 0, wallOffset)
   );
   // Set group rotation (Y axis)
   colliderGroup.position.set(0, 0, 0);

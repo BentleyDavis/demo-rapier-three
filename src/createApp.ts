@@ -84,14 +84,46 @@ export function createApp() {
   //  };
   // printChunk(idArray);
 
+
   // Add a cue ball after object placement
   const cueBall: AnyObjectData & { velocity?: { x: number; y: number; z: number } } = {
     type: 'ball',
     color: 0xffffff,
-    position: { x: 1, y: 0.5, z: 0 },
-    velocity: { x: 4, y: 0, z: 0 }
+    position: { x: 1, y: 0.2, z: 0 },
+    velocity: { x: 7, y: 0, z: 0 }
   };
   objects.push(cueBall);
+
+  // Add 10 more balls randomly above the chunk, each going toward the center
+  const numBalls = 10;
+  const chunkWidth = chunkConfig.worldConfig.width * 2;
+  const chunkHeight = chunkConfig.worldConfig.height * 2;
+  const center = { x: chunkWidth / 2, y: 0.5, z: chunkHeight / 2 };
+  const cueSpeed = Math.sqrt(
+    cueBall.velocity!.x * cueBall.velocity!.x +
+    cueBall.velocity!.y * cueBall.velocity!.y +
+    cueBall.velocity!.z * cueBall.velocity!.z
+  );
+  for (let i = 0; i < numBalls; i++) {
+    // Random position above the chunk
+    const x = Math.random() * chunkWidth;
+    const z = Math.random() * chunkHeight;
+    const y = 2 + Math.random() * 1; // a bit higher than the cue ball
+    // Direction vector toward center
+    const dx = center.x - x;
+    const dz = center.z - z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const vx = (dx / len) * cueSpeed;
+    const vz = (dz / len) * cueSpeed;
+    objects.push({
+      type: 'ball',
+      color: 0xffaa00,
+      position: { x, y, z },
+      velocity: { x: vx, y: 0, z: vz }
+    });
+  }
+
+  
 
   const config: EngineConfig = {
     world: {
