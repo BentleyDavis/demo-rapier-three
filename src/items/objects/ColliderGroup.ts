@@ -37,6 +37,7 @@ export class ColliderGroup {
         z: worldRot.z,
         w: worldRot.w,
       });
+      desc.setRestitution(.9);
       const collider = world.createCollider(desc, body);
       result.push(collider);
     }

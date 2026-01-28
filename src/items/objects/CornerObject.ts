@@ -1,7 +1,7 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
 import { Mesh, Scene, Group, Vector3, MeshStandardMaterial, Shape, ExtrudeGeometry, CatmullRomCurve3 } from 'three';
-import { createWallMesh, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
+import { createWall, tileWidth, wallHeight, wallThickness, wallMaterial } from './wallUtils.js';
 import { floorThickness } from '../floorConstants';
 import { ColliderGroup } from './ColliderGroup';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
@@ -15,7 +15,6 @@ export interface CornerObjectData extends BaseObjectData {
 
 export interface CornerObject extends BaseObject {
   data: CornerObjectData;
-  visual: Group;
 }
 
 
@@ -28,8 +27,8 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
   // Represent a corner as a single curved wall
   const group = new Group();
   // Parameters for the curved wall
-  // Calculate radius so the outer face of the wall is flush with the tile edge, matching other objects
-  const radius = tileWidth / 2 - wallThickness / 2;
+  // Calculate radius so the outer face of the wall extends half a wall thickness past the tile edge
+  const radius = tileWidth / 2;
   const arcAngle = Math.PI / 2; // 90 degrees
   const wallSegments = 32;
   // Create a custom curved wall mesh using TubeGeometry and a quarter-circle curve
@@ -47,7 +46,8 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
   const meshArcSegments = 64;
   // Offset the extrusion path inward by half the wall thickness (center the wall on the arc)
   const pathRadius = radius;
-  const straightLength = tileWidth / 2;
+  // Extend straight length so the wall mesh extends half a wall thickness past the tile edge
+  const straightLength = tileWidth / 2 + wallThickness / 2;
   const arcPoints: Vector3[] = [];
   // Start tangent direction (at t=0, angle=0): tangent is (1,0,0)
   arcPoints.push(new Vector3(-straightLength, 0, -pathRadius));
@@ -74,8 +74,7 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
     extrudePath: arcCurve
   };
   const curvedWallGeometry = new ExtrudeGeometry(wallShape, extrudeSettings);
-  const curvedWallMaterial = new MeshStandardMaterial({ color: 0x888888 });
-  const curvedWallMesh = new Mesh(curvedWallGeometry, curvedWallMaterial);
+  const curvedWallMesh = new Mesh(curvedWallGeometry, wallMaterial);
   // Match wallUtils: base sits on top of the floor
   curvedWallMesh.position.y = floorThickness;
   group.add(curvedWallMesh);
@@ -87,21 +86,33 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
   for (const m of floorMeshes) group.add(m);
   scene.add(group);
 
-  // Curved collider for the wall
-  // Approximate the arc with multiple small cuboids
+  // Colliders for the wall: two straight segments and the arc
   const colliderGroup = new ColliderGroup();
+  // 1. Straight segment along -X (from tile edge to arc start)
+  // The straight segment runs from (-straightLength, 0, -radius) to (0, 0, -radius)
+  const straightPartLength = straightLength;
+  const straightCollider1 = rapier.ColliderDesc.cuboid(straightPartLength / 2, wallHeight / 2, wallThickness / 2);
+  straightCollider1.setActiveEvents(1);
+  // Center is halfway between -straightLength and 0 on X, Z is -radius
+  colliderGroup.addCollider(
+    straightCollider1,
+    new Vector3(-straightLength / 2, wallHeight / 2, -radius)
+  );
+
+  // 2. Arc segment (approximate with small cuboids)
   const colliderArcSegments = 8;
   const segmentAngle = arcAngle / colliderArcSegments;
   for (let i = 0; i < colliderArcSegments; i++) {
     const angle = segmentAngle * (i + 0.5);
-    const x = radius * Math.cos(angle);
-    const z = -radius * Math.sin(angle);
-    const clDesc = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, (radius * segmentAngle) / 2);
+    const x = radius * Math.sin(angle);
+    const z = -radius * Math.cos(angle);
+    const arcLength = radius * segmentAngle;
+    const clDesc = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, arcLength / 2);
     clDesc.setActiveEvents(1);
     // Set rotation using quaternion if available
     if (clDesc.setRotation) {
       // Y-axis quaternion for angle
-      const halfAngle = (angle - Math.PI / 4) / 2;
+      const halfAngle = angle / 2;
       const qy = Math.sin(halfAngle);
       const qw = Math.cos(halfAngle);
       clDesc.setRotation({ x: 0, y: qy, z: 0, w: qw });
@@ -111,6 +122,18 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
       new Vector3(x, wallHeight / 2, z)
     );
   }
+
+  // 3. Straight segment along +Z (from arc end to tile edge)
+  // The straight segment runs from (radius, 0, 0) to (radius, 0, straightLength)
+  const straightCollider2 = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, straightPartLength / 2);
+  straightCollider2.setActiveEvents(1);
+  // Center is halfway between 0 and straightLength on Z, X is radius
+  colliderGroup.addCollider(
+    straightCollider2,
+    new Vector3(radius, wallHeight / 2, straightLength / 2)
+  );
+
+  // Apply group rotation if needed
   let groupRotation = 0;
   if (data.rotation) {
     groupRotation = data.rotation;
@@ -122,10 +145,9 @@ function create(data: CornerObjectData, scene: Scene, world: World, rapier: Rapi
   // Use both wall meshes and floor mesh
   const obj: CornerObject = {
     data,
-    mesh: group,
-    visual: group,
+    meshGroup: group,
     body,
-    collider: [...wallColliders, ...floorColliders]
+    colliders: [...wallColliders, ...floorColliders]
   };
   configureBaseObjectPhysics(obj);
   return obj;

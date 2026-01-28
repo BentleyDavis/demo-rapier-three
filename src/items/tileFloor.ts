@@ -33,6 +33,7 @@ export function createTileFloor(
   }
   const clDesc = rapier.ColliderDesc.cuboid(size / 2, floorThickness / 2, size / 2);
   clDesc.setActiveEvents(1);
+  clDesc.setRestitution(0);
   const collider = world.createCollider(clDesc, floorBody);
   return { meshes: [mesh], colliders: [collider] };
 }

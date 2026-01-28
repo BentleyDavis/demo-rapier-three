@@ -1,9 +1,10 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
 import { Mesh, Scene, Group, Vector3 } from 'three';
-import { createWallMesh, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
+import { createWall, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
 import { ColliderGroup } from './ColliderGroup';
 import { createTileFloor } from '../tileFloor';
+import { floorThickness } from '../floorConstants';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
 
 export interface CorridorObjectData extends BaseObjectData {
@@ -26,14 +27,14 @@ function create(data: CorridorObjectData, scene: Scene, world: World, rapier: Ra
   const group = new Group();
 
   // Calculate wall positions based on wallLength and wallThickness
-  const wallOffset = (tileWidth - wallThickness) / 2;
+  const wallOffset = -(tileWidth / 2);
 
   // Wall on the west (x = -wallOffset)
-  const wallW = createWallMesh('vertical');
+  const wallW = createWall('vertical');
   wallW.position.x = -wallOffset;
 
   // Wall on the east (x = +wallOffset)
-  const wallE = createWallMesh('vertical');
+  const wallE = createWall('vertical');
   wallE.position.x = wallOffset;
   group.add(wallW);
   group.add(wallE);
@@ -51,13 +52,13 @@ function create(data: CorridorObjectData, scene: Scene, world: World, rapier: Ra
   clDescW.setActiveEvents(1);
   colliderGroup.addCollider(
     clDescW,
-    new Vector3(-wallOffset, 0, 0)
+    new Vector3(-wallOffset, wallHeight / 2 + floorThickness, 0)
   );
   const clDescE = rapier.ColliderDesc.cuboid(wallThickness / 2, wallHeight / 2, tileWidth / 2);
   clDescE.setActiveEvents(1);
   colliderGroup.addCollider(
     clDescE,
-    new Vector3(wallOffset, 0, 0)
+    new Vector3(wallOffset, wallHeight / 2 + floorThickness, 0)
   );
   let groupRotation = 0;
   if (data.rotation) {
@@ -69,9 +70,9 @@ function create(data: CorridorObjectData, scene: Scene, world: World, rapier: Ra
 
   const obj: CorridorObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: [...wallColliders, ...floorColliders]
+    colliders: [...wallColliders, ...floorColliders]
   };
   configureBaseObjectPhysics(obj);
   return obj;

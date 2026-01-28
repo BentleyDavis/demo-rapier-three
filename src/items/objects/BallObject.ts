@@ -29,9 +29,9 @@ function create(data: BallObjectData, scene: Scene, world: World, rapier: Rapier
   const collider = world.createCollider(clDesc, body);
   const obj: BallObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: [collider]
+    colliders: [collider]
   };
   configureBaseObjectPhysics(obj);
   // Set initial velocity if provided

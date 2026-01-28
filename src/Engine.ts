@@ -190,7 +190,7 @@ export class Engine {
       if (create) {
         // Cast objConfig to the expected type for the builder
         const result = create(objConfig as any, this.scene, this.physicsWorld!, this.rapier);
-        if (result && result.mesh && result.body) {
+        if (result && result.meshGroup && result.body) {
           this.objects.push(result);
         }
       } else {
@@ -236,7 +236,7 @@ export class Engine {
       this.eventQueue.drainCollisionEvents((handle1: number, handle2: number, started: boolean) => {
         if (!started) return;
         const findObjByHandle = (handle: number) =>
-          this.objects.find(obj => obj.collider.some(c => c.handle === handle));
+          this.objects.find(obj => obj.colliders.some(c => c.handle === handle));
         const obj1 = findObjByHandle(handle1);
         const obj2 = findObjByHandle(handle2);
         if (obj1 && typeof obj1.handleCollision === 'function') {
@@ -249,10 +249,10 @@ export class Engine {
     }
     // Update mesh positions for all objects after physics step
     for (const obj of this.objects) {
-      if (!obj.body || !obj.mesh) continue;
+      if (!obj.body || !obj.meshGroup) continue;
       const t = obj.body.translation();
-      if (obj.mesh && obj.mesh.position && typeof obj.mesh.position.set === 'function') {
-        obj.mesh.position.set(t.x, t.y, t.z);
+      if (obj.meshGroup && obj.meshGroup.position && typeof obj.meshGroup.position.set === 'function') {
+        obj.meshGroup.position.set(t.x, t.y, t.z);
       } else {
         console.error('Object mesh is not a THREE.Group or does not have a position property:', obj);
       }

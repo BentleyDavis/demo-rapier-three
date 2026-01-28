@@ -27,9 +27,9 @@ function create(data: LandObjectData, scene: Scene, world: World, rapier: Rapier
   scene.add(group);
   const obj: LandObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: floorColliders
+    colliders: floorColliders
   };
   configureBaseObjectPhysics(obj);
   return obj;

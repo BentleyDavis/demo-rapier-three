@@ -28,9 +28,9 @@ function create(data: BumperObjectData, scene: Scene, world: World, rapier: Rapi
   const collider: import('@dimforge/rapier3d').Collider = world.createCollider(clDesc, body);
   const obj: BumperObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: [collider],
+    colliders: [collider],
     handleCollision: (other, world) => {
       if (!other || !world) return;
       // Only bump balls
@@ -55,7 +55,7 @@ function step(obj: BumperObject, dt: number, allObjects: BaseObject[], world: Wo
   for (const target of allObjects) {
     if (target.body.isFixed() || !('collider' in target)) continue;
     // Check for contact between bumper and target collider
-    if (world.intersectionPair(obj.collider[0], target.collider[0])) {
+    if (world.intersectionPair(obj.colliders[0], target.colliders[0])) {
       // Calculate direction from bumper to target
       const t1 = target.body.translation();
       const t2 = obj.body.translation();

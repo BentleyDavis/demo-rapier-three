@@ -90,7 +90,7 @@ export function createApp() {
     type: 'ball',
     color: 0xffffff,
     position: { x: 1, y: 0.2, z: 0 },
-    velocity: { x: 7, y: 0, z: 0 }
+    velocity: { x: 15, y: 0, z: 0 }
   };
   objects.push(cueBall);
 
@@ -105,10 +105,23 @@ export function createApp() {
     cueBall.velocity!.z * cueBall.velocity!.z
   );
   for (let i = 0; i < numBalls; i++) {
-    // Random position above the chunk
-    const x = Math.random() * chunkWidth;
-    const z = Math.random() * chunkHeight;
-    const y = 2 + Math.random() * 1; // a bit higher than the cue ball
+    // Random position on the perimeter of the chunk
+    let x, z;
+    const edge = Math.floor(Math.random() * 4);
+    if (edge === 0) { // top edge (z = 0)
+      x = Math.random() * chunkWidth;
+      z = 0;
+    } else if (edge === 1) { // bottom edge (z = chunkHeight)
+      x = Math.random() * chunkWidth;
+      z = chunkHeight;
+    } else if (edge === 2) { // left edge (x = 0)
+      x = 0;
+      z = Math.random() * chunkHeight;
+    } else { // right edge (x = chunkWidth)
+      x = chunkWidth;
+      z = Math.random() * chunkHeight;
+    }
+    const y = 1.5; // a bit higher than the cue ball
     // Direction vector toward center
     const dx = center.x - x;
     const dz = center.z - z;

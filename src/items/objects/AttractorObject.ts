@@ -28,9 +28,9 @@ function create(data: AttractorObjectData, scene: Scene, world: World, rapier: R
   const collider = world.createCollider(clDesc, body);
   const obj: AttractorObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: [collider],
+    colliders: [collider],
     handleCollision: (other, world) => {
       // Attractor-specific collision logic (if any)
     }

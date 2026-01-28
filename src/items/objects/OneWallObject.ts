@@ -1,7 +1,7 @@
 import type { World } from '@dimforge/rapier3d';
 import type { Rapier } from '../../physics/rapier';
 import { Mesh, Scene, Group, Vector3 } from 'three';
-import { createWallMesh, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
+import { createWall, tileWidth, wallHeight, wallThickness } from './wallUtils.js';
 import { ColliderGroup } from './ColliderGroup';
 import { createTileFloor } from '../tileFloor';
 import { BaseObject, BaseObjectData, configureBaseObjectPhysics } from './BaseObject';
@@ -19,9 +19,10 @@ export interface OneWallObject extends BaseObject {
 
 function create(data: OneWallObjectData, scene: Scene, world: World, rapier: Rapier): OneWallObject {
   // Calculate wall position for the north edge based on wallLength and wallThickness
-  const wallOffset = -(tileWidth - wallThickness) / 2;
+  // Wall should be centered so that half its thickness extends past the tile edge
+  const wallOffset = -(tileWidth / 2);
   // Wall geometry: always at the north edge (z = wallOffset), matching N/S closed, E/W open pattern
-  const wallMesh = createWallMesh('horizontal');
+  const wallMesh = createWall('horizontal');
   wallMesh.position.z = wallOffset;
 
   // Group all meshes
@@ -60,9 +61,9 @@ function create(data: OneWallObjectData, scene: Scene, world: World, rapier: Rap
 
   const obj: OneWallObject = {
     data,
-    mesh: group,
+    meshGroup: group,
     body,
-    collider: [...wallColliders, ...floorColliders]
+    colliders: [...wallColliders, ...floorColliders]
   };
   configureBaseObjectPhysics(obj);
   return obj;
